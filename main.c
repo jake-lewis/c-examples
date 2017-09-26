@@ -48,12 +48,11 @@ void evaluate(char *buf, int factor, int value, char *result)
 
     strncpy(temp, ((value % factor == 0) ? result : ""), MAX_WORD_LEN -1);
 
-    printDebug("Evaluating complete || Result: \"%s\"\n", temp);
+    printDebug("Evaluating complete || Result: \"%s\"\n\n", temp);
 
     //Check array is not empty
     if (value % factor == 0)
     {
         strncat(buf, temp, MAX_STRING_LEN -1);
     }
-    printDebug("End of eval: Value %d. Factor %d\n\n", value, factor);
 }
