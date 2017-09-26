@@ -53,3 +53,6 @@ dkms.conf
 
 #Intellij stuff
 .idea/
+
+#CMake stuff
+cmake-build-debug/
