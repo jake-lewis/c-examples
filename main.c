@@ -1,6 +1,4 @@
-#include <stdio.h>
 #include <string.h>
-#include <stdlib.h>
 #include "debug_util.c"
 
 void evaluate(char*, int, int, char*);
@@ -23,7 +21,9 @@ int main()
          * effectively clearing the array,
          * if it is only read as a sequential string */
         output[0] = '\0';
-        itoa(i, intVal, 10);
+
+        snprintf(intVal, 3,"%d",i);
+
         evaluate(output, 3, i, "Fizz");
         evaluate(output, 4, i, "Buzz");
         evaluate(output, 5, i, "Sizzle");
