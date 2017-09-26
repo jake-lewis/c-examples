@@ -5,7 +5,7 @@ void evaluate(char*, int, int, char*);
 const int MAX_STRING_LEN = 17;
 const int MAX_WORD_LEN = 7;
 const int MAX_DIGIT_COUNT_LEN = 4;
-const bool LOCAL_DEBUG_FLAG = true;
+const bool LOCAL_DEBUG_FLAG = false;
 
 int main()
 {
@@ -30,30 +30,30 @@ int main()
         evaluate(output, 4, i, "Buzz");
         evaluate(output, 5, i, "Sizzle");
 
-        printDebug("string test0");
-        strcat(output, '\0');
+        output[sizeof(output)] = '\0';
 
-        printDebug("test 1");
-        char *result = (output == "") ? intVal : output;
+        if (output[0] == '\0')
+        {
+            strncat(output, intVal, MAX_DIGIT_COUNT_LEN);
+        }
 
-        printDebug("test2");
-        printf("%s\n", result);
+        printf("%s\n", output);
     }
-    printDebug("test3");
 }
 
 void evaluate(char *buf, int factor, int value, char *result)
 {
     printDebug("Evaluating || Factor: %d, Value: %d, Success Result: %s\n", factor, value, result);
     char temp[MAX_WORD_LEN];
+
     strncpy(temp, ((value % factor == 0) ? result : ""), MAX_WORD_LEN -1);
 
     printDebug("Evaluating complete || Result: \"%s\"\n", temp);
 
     //Check array is not empty
-    if (temp[0] != 0)
+    if (value % factor == 0)
     {
-        strcat(temp, buf);
+        strncat(buf, temp, MAX_STRING_LEN -1);
     }
     printDebug("End of eval: Value %d. Factor %d\n\n", value, factor);
 }
