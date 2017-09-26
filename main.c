@@ -18,7 +18,7 @@ int main()
 
     for (i = 1; i <= 100; i++)
     {
-        printDebug("Setting initial output to null\n");
+        printDebug("Setting initial output to null\n\n");
         /* Set first value in array to null termination,
          * effectively clearing the array,
          * if it is only read as a sequential string */
@@ -29,17 +29,22 @@ int main()
         evaluate(output, 3, i, "Fizz");
         evaluate(output, 4, i, "Buzz");
         evaluate(output, 5, i, "Sizzle");
+
+        printDebug("string test0");
         strcat(output, '\0');
 
+        printDebug("test 1");
         char *result = (output == "") ? intVal : output;
 
+        printDebug("test2");
         printf("%s\n", result);
     }
+    printDebug("test3");
 }
 
 void evaluate(char *buf, int factor, int value, char *result)
 {
-    printDebug("Evaluating || Factor: %d, Value: %d, Result: %s\n", factor, value, result);
+    printDebug("Evaluating || Factor: %d, Value: %d, Success Result: %s\n", factor, value, result);
     char temp[MAX_WORD_LEN];
     strncpy(temp, ((value % factor == 0) ? result : ""), MAX_WORD_LEN -1);
 
@@ -50,4 +55,5 @@ void evaluate(char *buf, int factor, int value, char *result)
     {
         strcat(temp, buf);
     }
+    printDebug("End of eval: Value %d. Factor %d\n\n", value, factor);
 }
