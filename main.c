@@ -1,5 +1,6 @@
 #include <stdio.h>
 #include <string.h>
+#include <stdlib.h>
 #include "debug_util.c"
 
 void evaluate(char*, int, int, char*);
@@ -11,6 +12,7 @@ int main()
     DEBUG = LOCAL_DEBUG_FLAG;
     int i;
     char output[MAX_STRING_LEN];
+    char intVal[3];
 
     printDebug("Initial Loop Start\n");
 
@@ -21,13 +23,15 @@ int main()
          * effectively clearing the array,
          * if it is only read as a sequential string */
         output[0] = '\0';
-
+        itoa(i, intVal, 10);
         evaluate(output, 3, i, "Fizz");
-        evaluate(output, 3, i, "Fizz");
-        evaluate(output, 3, i, "Fizz");
+        evaluate(output, 4, i, "Buzz");
+        evaluate(output, 5, i, "Sizzle");
         strcat(output, '\0');
 
-        printf(output + '\n');
+        char *result = (output == "") ? intVal : output;
+
+        printf("%s\n", result);
     }
 }
 
@@ -37,5 +41,9 @@ void evaluate(char *buf, int factor, int value, char *result)
     char *temp = (value % factor == 0) ? result : "";
 
     printDebug("Evaluating complete || Result: %s\n", temp);
-    strcat(temp, buf);
+
+    if (temp != "")
+    {
+        strcat(temp, buf);
+    }
 }
