@@ -1,7 +1,3 @@
-//
-// Created by Jake Lewis on 26/09/2017.
-//
-
 #ifndef C_EXAMPLES_DEBUG_UTIL_H
 #define C_EXAMPLES_DEBUG_UTIL_H
 
@@ -9,12 +5,21 @@
 #include <stdio.h>
 #endif
 
-#include <zconf.h>
+#ifndef _STDARG_H
+#include <stdarg.h>
+#endif
 
 #ifndef _STDBOOL_H
 #include <stdbool.h>
 #endif
 
-extern bool DEBUG;
+//int printDebug(const char*, ...);
+#ifdef DEBUG
+#define DEBUG_TEST 1
+#else
+#define DEBUG_TEST 0
+#endif
+
+#define printDebug(fmt, ...) do { if (DEBUG_TEST) fprintf(stderr, fmt, ##__VA_ARGS__); } while (0)
 
 #endif //C_EXAMPLES_DEBUG_UTIL_H

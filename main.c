@@ -5,7 +5,6 @@ void evaluate(char*, int, int, char*);
 const int maxStringLengthConst = 17;
 const int maxWordLengthConst = 7;
 const int maxDigitLengthConst = 4;
-const bool debugConst = false;
 
 int main(void)
 {
