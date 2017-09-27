@@ -2,17 +2,16 @@
 #include "debug_util.c"
 
 void evaluate(char*, int, int, char*);
-const int MAX_STRING_LEN = 17;
-const int MAX_WORD_LEN = 7;
-const int MAX_DIGIT_COUNT_LEN = 4;
-const bool LOCAL_DEBUG_FLAG = false;
+const int maxStringLengthConst = 17;
+const int maxWordLengthConst = 7;
+const int maxDigitLengthConst = 4;
+const bool debugConst = false;
 
-int main()
+int main(void)
 {
-    DEBUG = LOCAL_DEBUG_FLAG;
     int i;
-    char output[MAX_STRING_LEN];
-    char intVal[MAX_DIGIT_COUNT_LEN];
+    char output[maxStringLengthConst];
+    char intVal[maxDigitLengthConst];
 
     printDebug("Initial Loop Start\n");
 
@@ -24,7 +23,7 @@ int main()
          * if it is only read as a sequential string */
         output[0] = '\0';
 
-        snprintf(intVal, MAX_DIGIT_COUNT_LEN,"%d",i);
+        snprintf(intVal, maxDigitLengthConst,"%d",i);
 
         evaluate(output, 3, i, "Fizz");
         evaluate(output, 4, i, "Buzz");
@@ -34,25 +33,28 @@ int main()
 
         if (output[0] == '\0')
         {
-            strncat(output, intVal, MAX_DIGIT_COUNT_LEN);
+            strncat(output, intVal, maxDigitLengthConst);
         }
 
         printf("%s\n", output);
     }
+
+    //Only optional in C99
+    return 0;
 }
 
 void evaluate(char *buf, int factor, int value, char *result)
 {
     printDebug("Evaluating || Factor: %d, Value: %d, Success Result: %s\n", factor, value, result);
-    char temp[MAX_WORD_LEN];
+    char temp[maxWordLengthConst];
 
-    strncpy(temp, ((value % factor == 0) ? result : ""), MAX_WORD_LEN -1);
+    strncpy(temp, ((value % factor == 0) ? result : ""), maxWordLengthConst -1);
 
     printDebug("Evaluating complete || Result: \"%s\"\n\n", temp);
 
     //Check array is not empty
     if (value % factor == 0)
     {
-        strncat(buf, temp, MAX_STRING_LEN -1);
+        strncat(buf, temp, maxStringLengthConst -1);
     }
 }
