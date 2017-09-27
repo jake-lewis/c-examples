@@ -1,5 +1,6 @@
 #include <string.h>
-#include "debug_util.c"
+#include <stdio.h>
+#include "debug_util.h"
 
 void evaluate(char*, int, int, char*);
 const int maxStringLengthConst = 17;
