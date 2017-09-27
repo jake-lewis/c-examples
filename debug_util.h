@@ -9,10 +9,6 @@
 #include <stdarg.h>
 #endif
 
-#ifndef _STDBOOL_H
-#include <stdbool.h>
-#endif
-
 //int printDebug(const char*, ...);
 #ifdef DEBUG
 #define DEBUG_TEST 1
