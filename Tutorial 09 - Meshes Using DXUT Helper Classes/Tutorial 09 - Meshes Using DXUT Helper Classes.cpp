@@ -79,6 +79,8 @@ int							g_height = 600;;
 // Meshes here.																//
 //**************************************************************************//
 CDXUTSDKMesh                g_MeshTiger;			// Wot, not a pointer type?
+CDXUTSDKMesh				g_MeshWingLH;
+CDXUTSDKMesh				g_MeshWingRH;
 
 XMMATRIX					g_MatProjection;
 
@@ -597,6 +599,8 @@ HRESULT CALLBACK OnD3D11CreateDevice( ID3D11Device* pd3dDevice, const DXGI_SURFA
     // Load the mesh.															//
 	//**************************************************************************//
     V_RETURN( g_MeshTiger.Create( pd3dDevice, L"Media\\tiger\\tiger.sdkmesh", true ) );
+	V_RETURN( g_MeshWingLH.Create(pd3dDevice, L"Media\\wing\\wing.sdkmesh", true));
+	V_RETURN(g_MeshWingRH.Create(pd3dDevice, L"Media\\wing\\wing.sdkmesh", true));
 
 
 	// Create a sampler state
@@ -723,7 +727,20 @@ void CALLBACK OnD3D11FrameRender( ID3D11Device* pd3dDevice, ID3D11DeviceContext*
 	XMMATRIX matWorldViewProjection;
 	matWorldViewProjection = matTigerWorld * matView * g_MatProjection;
 
+	//Create world matrix for wings
+	XMMATRIX matWingLHTranslate = XMMatrixTranslation(0, 0, 0);
+	XMMATRIX matWingLHScale = XMMatrixScaling(0.1f, 0.1f, 0.1f);
+	XMMATRIX matWingWorldLH = matWingLHTranslate * matTigerWorld * matWingLHScale;
 
+	XMMATRIX matWingLHWorldViewProjection;
+	matWingLHWorldViewProjection = matWingWorldLH * matView * g_MatProjection;
+
+	XMMATRIX matWingRHRotate = XMMatrixRotationY(XMConvertToRadians(180));
+	XMMATRIX matWingRHScale = XMMatrixScaling(0.1f, 0.1f, 0.1f);
+	XMMATRIX matWingWorldRH = matWingWorldLH * matWingRHRotate * matTigerWorld * matWingRHScale;
+
+	XMMATRIX matWingRHWorldViewProjection;
+	matWingRHWorldViewProjection = matWingWorldRH * matView * g_MatProjection;
 
 	//******************************************************************//    
 	// Update shader variables.  We must update these for every mesh	//
@@ -743,6 +760,16 @@ void CALLBACK OnD3D11FrameRender( ID3D11Device* pd3dDevice, ID3D11DeviceContext*
 	CBMatrices.matWorldViewProj = XMMatrixTranspose(matWorldViewProjection);
 	pd3dImmediateContext->UpdateSubresource( g_pcbVSPerObject, 0, NULL, &CBMatrices, 0, 0 );
 	pd3dImmediateContext->VSSetConstantBuffers( 0, 1, &g_pcbVSPerObject );
+
+	CBMatrices.matWorld = XMMatrixTranspose(matWingWorldLH);
+	CBMatrices.matWorldViewProj = XMMatrixTranspose(matWingLHWorldViewProjection);
+	pd3dImmediateContext->UpdateSubresource(g_pcbVSPerObject, 0, NULL, &CBMatrices, 0, 0);
+	pd3dImmediateContext->VSSetConstantBuffers(0, 1, &g_pcbVSPerObject);
+
+	CBMatrices.matWorld = XMMatrixTranspose(matWingWorldRH);
+	CBMatrices.matWorldViewProj = XMMatrixTranspose(matWingRHWorldViewProjection);
+	pd3dImmediateContext->UpdateSubresource(g_pcbVSPerObject, 0, NULL, &CBMatrices, 0, 0);
+	pd3dImmediateContext->VSSetConstantBuffers(0, 1, &g_pcbVSPerObject);
 
 	//******************************************************************//
 	// Lighting.  Ambient light and a light direction, above, to the	//
@@ -774,6 +801,8 @@ void CALLBACK OnD3D11FrameRender( ID3D11Device* pd3dDevice, ID3D11DeviceContext*
 	// Render the mesh.															//
 	//**************************************************************************//
 	RenderMesh (pd3dImmediateContext, &g_MeshTiger);
+	RenderMesh(pd3dImmediateContext, &g_MeshWingLH);
+	RenderMesh(pd3dImmediateContext, &g_MeshWingRH);
     
 	
 	//**************************************************************************//
@@ -858,6 +887,8 @@ void CALLBACK OnD3D11DestroyDevice( void* pUserContext )
     SAFE_DELETE( g_pTxtHelper );
 
     g_MeshTiger.Destroy();
+	g_MeshWingLH.Destroy();
+	g_MeshWingRH.Destroy();
                 
     SAFE_RELEASE( g_pVertexLayout11 );
     SAFE_RELEASE( g_pVertexBuffer );
