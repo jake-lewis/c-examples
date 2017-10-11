@@ -719,57 +719,36 @@ void CALLBACK OnD3D11FrameRender( ID3D11Device* pd3dDevice, ID3D11DeviceContext*
 	// the Y axis of 45 degrees.  DirectX does all angles in radians,	//
 	// hence the conversion.  And a translate.							//
 	//******************************************************************//
-	XMMATRIX matTigerTranslate = XMMatrixTranslation(0, 0, 2);
+
+
+	float rotation = sin(timeGetTime() / 1000.0);
+
+	XMMATRIX matTigerTranslate = XMMatrixTranslation(0, 0, 0);
 	XMMATRIX matTigerRotate    = XMMatrixRotationY(g_f_TigerRY);
-	XMMATRIX matTigerScale     = XMMatrixScaling(10, 10, 10);
+	XMMATRIX matTigerScale     = XMMatrixScaling(2, 2, 2);
 	XMMATRIX matTigerWorld     = matTigerRotate * matTigerTranslate * matTigerScale;
     
 	XMMATRIX matWorldViewProjection;
 	matWorldViewProjection = matTigerWorld * matView * g_MatProjection;
 
 	//Create world matrix for wings
-	XMMATRIX matWingLHTranslate = XMMatrixTranslation(0, 0, 0);
-	XMMATRIX matWingLHScale = XMMatrixScaling(0.1f, 0.1f, 0.1f);
-	XMMATRIX matWingWorldLH = matWingLHTranslate * matTigerWorld * matWingLHScale;
+	XMMATRIX matWingLHTranslate = XMMatrixTranslation(0.1, 0.6, -0.8);
+	XMMATRIX matWingLHRotationZ = XMMatrixRotationZ(rotation);
+	XMMATRIX matWingLHScale = XMMatrixScaling(0.7f, 0.7f, 0.7f);
+	XMMATRIX matWingLHWorld = matWingLHRotationZ * matWingLHTranslate * matWingLHScale * matTigerWorld;
 
 	XMMATRIX matWingLHWorldViewProjection;
-	matWingLHWorldViewProjection = matWingWorldLH * matView * g_MatProjection;
+	matWingLHWorldViewProjection = matWingLHWorld * matView * g_MatProjection;
+
+	//Animate?
 
 	XMMATRIX matWingRHRotate = XMMatrixRotationY(XMConvertToRadians(180));
-	XMMATRIX matWingRHScale = XMMatrixScaling(0.1f, 0.1f, 0.1f);
-	XMMATRIX matWingWorldRH = matWingWorldLH * matWingRHRotate * matTigerWorld * matWingRHScale;
+	XMMATRIX matWingRHRotationZ = XMMatrixRotationZ(rotation);
+	XMMATRIX matWingWorldRH = matWingRHRotate * matWingRHRotationZ * matWingLHWorld;
 
 	XMMATRIX matWingRHWorldViewProjection;
 	matWingRHWorldViewProjection = matWingWorldRH * matView * g_MatProjection;
 
-	//******************************************************************//    
-	// Update shader variables.  We must update these for every mesh	//
-	// that we draw (well, actually we need only update the position	//
-	// for each mesh, think hard about this - Nigel						//
-	//																	//
-    // We pass the parameters to it in a constant buffer.  The buffer	//
-	// we define in this module MUST match the constant buffer in the	//
-	// shader.															//
-	//																	//
-	// It would seem that the constant buffer we pass to the shader must//
-	// be global, well defined on the heap anyway.  Not a local variable//
-	// it would seem.													//
-	//******************************************************************//
-	CB_VS_PER_OBJECT CBMatrices;
-	CBMatrices.matWorld         = XMMatrixTranspose(matTigerWorld);
-	CBMatrices.matWorldViewProj = XMMatrixTranspose(matWorldViewProjection);
-	pd3dImmediateContext->UpdateSubresource( g_pcbVSPerObject, 0, NULL, &CBMatrices, 0, 0 );
-	pd3dImmediateContext->VSSetConstantBuffers( 0, 1, &g_pcbVSPerObject );
-
-	CBMatrices.matWorld = XMMatrixTranspose(matWingWorldLH);
-	CBMatrices.matWorldViewProj = XMMatrixTranspose(matWingLHWorldViewProjection);
-	pd3dImmediateContext->UpdateSubresource(g_pcbVSPerObject, 0, NULL, &CBMatrices, 0, 0);
-	pd3dImmediateContext->VSSetConstantBuffers(0, 1, &g_pcbVSPerObject);
-
-	CBMatrices.matWorld = XMMatrixTranspose(matWingWorldRH);
-	CBMatrices.matWorldViewProj = XMMatrixTranspose(matWingRHWorldViewProjection);
-	pd3dImmediateContext->UpdateSubresource(g_pcbVSPerObject, 0, NULL, &CBMatrices, 0, 0);
-	pd3dImmediateContext->VSSetConstantBuffers(0, 1, &g_pcbVSPerObject);
 
 	//******************************************************************//
 	// Lighting.  Ambient light and a light direction, above, to the	//
@@ -797,11 +776,43 @@ void CALLBACK OnD3D11FrameRender( ID3D11Device* pd3dDevice, ID3D11DeviceContext*
 
     pd3dImmediateContext->PSSetSamplers( 0, 1, &g_pSamLinear );
 
+	//******************************************************************//    
+	// Update shader variables.  We must update these for every mesh	//
+	// that we draw (well, actually we need only update the position	//
+	// for each mesh, think hard about this - Nigel						//
+	//																	//
+	// We pass the parameters to it in a constant buffer.  The buffer	//
+	// we define in this module MUST match the constant buffer in the	//
+	// shader.															//
+	//																	//
+	// It would seem that the constant buffer we pass to the shader must//
+	// be global, well defined on the heap anyway.  Not a local variable//
+	// it would seem.													//
+	//******************************************************************//
+	CB_VS_PER_OBJECT CBMatrices;
+	CBMatrices.matWorld = XMMatrixTranspose(matTigerWorld);
+	CBMatrices.matWorldViewProj = XMMatrixTranspose(matWorldViewProjection);
+	pd3dImmediateContext->UpdateSubresource(g_pcbVSPerObject, 0, NULL, &CBMatrices, 0, 0);
+	pd3dImmediateContext->VSSetConstantBuffers(0, 1, &g_pcbVSPerObject);
+
+	
 	//**************************************************************************//
 	// Render the mesh.															//
 	//**************************************************************************//
 	RenderMesh (pd3dImmediateContext, &g_MeshTiger);
+	
+	CBMatrices.matWorld = XMMatrixTranspose(matWingLHWorld);
+	CBMatrices.matWorldViewProj = XMMatrixTranspose(matWingLHWorldViewProjection);
+	pd3dImmediateContext->UpdateSubresource(g_pcbVSPerObject, 0, NULL, &CBMatrices, 0, 0);
+	pd3dImmediateContext->VSSetConstantBuffers(0, 1, &g_pcbVSPerObject); 
+
 	RenderMesh(pd3dImmediateContext, &g_MeshWingLH);
+
+	CBMatrices.matWorld = XMMatrixTranspose(matWingWorldRH);
+	CBMatrices.matWorldViewProj = XMMatrixTranspose(matWingRHWorldViewProjection);
+	pd3dImmediateContext->UpdateSubresource(g_pcbVSPerObject, 0, NULL, &CBMatrices, 0, 0);
+	pd3dImmediateContext->VSSetConstantBuffers(0, 1, &g_pcbVSPerObject);
+
 	RenderMesh(pd3dImmediateContext, &g_MeshWingRH);
     
 	

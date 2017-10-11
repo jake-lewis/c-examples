@@ -35,7 +35,7 @@
 cbuffer cbPerObject : register( b0 )
 {
 	matrix		g_mWorldViewProjection;	
-	matrix		g_mWorld;				
+	matrix		g_mWorld;
 };
 
 

@@ -37,7 +37,8 @@ c:\program files (x86)\microsoft directx sdk (june 2010)\include\xnamathconvert.
 c:\program files (x86)\microsoft directx sdk (june 2010)\include\xnamathvector.inl(1269): warning C4838: conversion from 'unsigned int' to 'INT' requires a narrowing conversion
 c:\program files (x86)\microsoft directx sdk (june 2010)\include\xnamathmisc.inl(518): warning C4838: conversion from 'unsigned int' to 'INT' requires a narrowing conversion
 c:\program files (x86)\microsoft directx sdk (june 2010)\include\xnamathmisc.inl(519): warning C4838: conversion from 'unsigned int' to 'INT' requires a narrowing conversion
-c:\users\jslewis\documents\git\c-examples\tutorial 09 - meshes using dxut helper classes\tutorial 09 - meshes using dxut helper classes.cpp(681): warning C4101: 'hr': unreferenced local variable
-c:\users\jslewis\documents\git\c-examples\tutorial 09 - meshes using dxut helper classes\tutorial 09 - meshes using dxut helper classes.cpp(780): warning C4189: 'fAmbient': local variable is initialized but not referenced
-  Tutorial 09 - Meshes Using DXUT Helper Classes_2010.vcxproj -> C:\Users\jslewis\Documents\git\c-examples\Tutorial 09 - Meshes Using DXUT Helper Classes\Debug\Tutorial 09 - Meshes Using DXUT Helper Classes.exe
-  Tutorial 09 - Meshes Using DXUT Helper Classes_2010.vcxproj -> C:\Users\jslewis\Documents\git\c-examples\Tutorial 09 - Meshes Using DXUT Helper Classes\Debug\Tutorial 09 - Meshes Using DXUT Helper Classes.pdb (Full PDB)
+c:\users\jslewis\source\repos\c-examples\tutorial 09 - meshes using dxut helper classes\tutorial 09 - meshes using dxut helper classes.cpp(724): warning C4244: 'initializing': conversion from 'double' to 'float', possible loss of data
+c:\users\jslewis\source\repos\c-examples\tutorial 09 - meshes using dxut helper classes\tutorial 09 - meshes using dxut helper classes.cpp(681): warning C4101: 'hr': unreferenced local variable
+c:\users\jslewis\source\repos\c-examples\tutorial 09 - meshes using dxut helper classes\tutorial 09 - meshes using dxut helper classes.cpp(759): warning C4189: 'fAmbient': local variable is initialized but not referenced
+  Tutorial 09 - Meshes Using DXUT Helper Classes_2010.vcxproj -> C:\Users\jslewis\Source\Repos\c-examples\Tutorial 09 - Meshes Using DXUT Helper Classes\Debug\Tutorial 09 - Meshes Using DXUT Helper Classes.exe
+  Tutorial 09 - Meshes Using DXUT Helper Classes_2010.vcxproj -> C:\Users\jslewis\Source\Repos\c-examples\Tutorial 09 - Meshes Using DXUT Helper Classes\Debug\Tutorial 09 - Meshes Using DXUT Helper Classes.pdb (Full PDB)
