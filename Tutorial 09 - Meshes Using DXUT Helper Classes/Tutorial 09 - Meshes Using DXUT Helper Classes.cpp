@@ -96,7 +96,7 @@ ID3D11SamplerState         *g_pSamLinear      = NULL;
 // The only one I have coded is rotate about Y, we need an x, y, z		//
 // position and maybe rotates about other axes.							//
 //**********************************************************************//
-float		 g_f_TigerRY            = XMConvertToRadians(45);  //45º default
+float		 g_f_TigerRY            = XMConvertToRadians(15);  //45º default
 
 bool		 g_b_LeftArrowDown      = false;	//Status of keyboard.  Thess are set
 bool		 g_b_RightArrowDown     = false;	//in the callback KeyboardProc(), and 
@@ -702,7 +702,7 @@ void CALLBACK OnD3D11FrameRender( ID3D11Device* pd3dDevice, ID3D11DeviceContext*
 	// The viewer matrix is created every frame here, which looks silly as the	//
 	// viewer never moves.  However in general your viewer does move.			//
 	//**************************************************************************//
-	XMVECTOR Eye = XMVectorSet( 0.0f, 1.0f, -10.0f, 0.0f );
+	XMVECTOR Eye = XMVectorSet( 0.0f, 1.0f, -5.0f, 0.0f );
 	XMVECTOR At  = XMVectorSet( 0.0f, 0.0f, 0.0f, 0.0f );
 	XMVECTOR Up  = XMVectorSet( 0.0f, 1.0f, 0.0f, 0.0f );
 	
@@ -722,6 +722,7 @@ void CALLBACK OnD3D11FrameRender( ID3D11Device* pd3dDevice, ID3D11DeviceContext*
 
 
 	float rotation = sin(timeGetTime() / 1000.0);
+	float rotation2 = cos(timeGetTime() / 1000.0);
 
 	XMMATRIX matTigerTranslate = XMMatrixTranslation(0, 0, 0);
 	XMMATRIX matTigerRotate    = XMMatrixRotationY(g_f_TigerRY);
@@ -732,6 +733,8 @@ void CALLBACK OnD3D11FrameRender( ID3D11Device* pd3dDevice, ID3D11DeviceContext*
 	matWorldViewProjection = matTigerWorld * matView * g_MatProjection;
 
 	//Create world matrix for wings
+
+	//LH Wing
 	XMMATRIX matWingLHTranslate = XMMatrixTranslation(0.1, 0.6, -0.8);
 	XMMATRIX matWingLHRotationZ = XMMatrixRotationZ(rotation);
 	XMMATRIX matWingLHScale = XMMatrixScaling(0.7f, 0.7f, 0.7f);
@@ -740,11 +743,10 @@ void CALLBACK OnD3D11FrameRender( ID3D11Device* pd3dDevice, ID3D11DeviceContext*
 	XMMATRIX matWingLHWorldViewProjection;
 	matWingLHWorldViewProjection = matWingLHWorld * matView * g_MatProjection;
 
-	//Animate?
-
-	XMMATRIX matWingRHRotate = XMMatrixRotationY(XMConvertToRadians(180));
-	XMMATRIX matWingRHRotationZ = XMMatrixRotationZ(rotation);
-	XMMATRIX matWingWorldRH = matWingRHRotate * matWingRHRotationZ * matWingLHWorld;
+	//RH Wing
+	XMMATRIX matWingRHTranslate = XMMatrixTranslation(0, 0, 1.6);
+	XMMATRIX matWingRHRotateY = XMMatrixRotationY(XMConvertToRadians(180));
+	XMMATRIX matWingWorldRH = matWingRHTranslate * matWingLHWorld * matWingRHRotateY ;
 
 	XMMATRIX matWingRHWorldViewProjection;
 	matWingRHWorldViewProjection = matWingWorldRH * matView * g_MatProjection;
