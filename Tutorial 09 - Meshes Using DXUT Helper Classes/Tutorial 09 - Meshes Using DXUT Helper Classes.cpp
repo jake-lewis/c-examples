@@ -81,6 +81,7 @@ int							g_height = 600;;
 CDXUTSDKMesh                g_MeshTiger;			// Wot, not a pointer type?
 CDXUTSDKMesh				g_MeshWingLH;
 CDXUTSDKMesh				g_MeshWingRH;
+CDXUTSDKMesh				g_MeshFloorTile;
 
 XMMATRIX					g_MatProjection;
 
@@ -96,7 +97,28 @@ ID3D11SamplerState         *g_pSamLinear      = NULL;
 // The only one I have coded is rotate about Y, we need an x, y, z		//
 // position and maybe rotates about other axes.							//
 //**********************************************************************//
-float		 g_f_TigerRY            = XMConvertToRadians(15);  //45º default
+struct TIGER
+{
+	float g_f_TigerRY;
+
+	float g_f_TigerX;
+	float g_f_TigerY;
+	float g_f_TigerZ;
+
+	float g_f_TigerSpeed;
+
+	XMVECTOR g_vecTigerInitDir;
+
+	TIGER() : 
+		g_f_TigerRY(XMConvertToRadians(15)), 
+		g_f_TigerX(0), 
+		g_f_TigerY(0), 
+		g_f_TigerZ(0), 
+		g_f_TigerSpeed(0), 
+		g_vecTigerInitDir(XMVectorSet(0, 0, -1, 0)) {}
+};
+
+TIGER g_Tiger;
 
 bool		 g_b_LeftArrowDown      = false;	//Status of keyboard.  Thess are set
 bool		 g_b_RightArrowDown     = false;	//in the callback KeyboardProc(), and 
@@ -334,8 +356,41 @@ bool CALLBACK ModifyDeviceSettings( DXUTDeviceSettings* pDeviceSettings, void* p
 //**************************************************************************//
 void CALLBACK OnFrameMove( double fTime, float fElapsedTime, void* pUserContext )
 {
-	if (g_b_LeftArrowDown)  g_f_TigerRY -= fElapsedTime*3;	// Frame rate 
-	if (g_b_RightArrowDown) g_f_TigerRY += fElapsedTime*3;	// independent.
+	if (g_b_LeftArrowDown)  g_Tiger.g_f_TigerRY -= fElapsedTime*3;	// Frame rate 
+	if (g_b_RightArrowDown) g_Tiger.g_f_TigerRY += fElapsedTime*3;	// independent.
+	if (g_b_UpArrowDown)	g_Tiger.g_f_TigerSpeed += fElapsedTime;
+	if (g_b_DownArrowDown)	g_Tiger.g_f_TigerSpeed -= fElapsedTime;
+
+	//If no speed modification
+	if (!g_b_UpArrowDown && !g_b_DownArrowDown)
+	{
+		//If moving forward
+		if (g_Tiger.g_f_TigerSpeed >= 0)
+		{
+			//Halt if slow
+			if (g_Tiger.g_f_TigerSpeed - (fElapsedTime / 2) < 0)
+			{
+				g_Tiger.g_f_TigerSpeed = 0;
+			}
+			else //Slow down
+			{
+				g_Tiger.g_f_TigerSpeed -= (fElapsedTime / 2);
+			}
+		}
+		else //Moving Backwards
+		{
+			//Halt if slow
+			if (g_Tiger.g_f_TigerSpeed + (fElapsedTime / 2) > 0)
+			{
+				g_Tiger.g_f_TigerSpeed = 0;
+			}
+			else // Slow down
+			{
+				g_Tiger.g_f_TigerSpeed += (fElapsedTime / 2);
+			}
+		}
+		
+	}
 }
 
 
@@ -601,6 +656,7 @@ HRESULT CALLBACK OnD3D11CreateDevice( ID3D11Device* pd3dDevice, const DXGI_SURFA
     V_RETURN( g_MeshTiger.Create( pd3dDevice, L"Media\\tiger\\tiger.sdkmesh", true ) );
 	V_RETURN( g_MeshWingLH.Create(pd3dDevice, L"Media\\wing\\wing.sdkmesh", true));
 	V_RETURN(g_MeshWingRH.Create(pd3dDevice, L"Media\\wing\\wing.sdkmesh", true));
+	V_RETURN(g_MeshFloorTile.Create(pd3dDevice, L"Media\\floor\\seafloor.sdkmesh", true));
 
 
 	// Create a sampler state
@@ -724,9 +780,20 @@ void CALLBACK OnD3D11FrameRender( ID3D11Device* pd3dDevice, ID3D11DeviceContext*
 	float rotation = sin(timeGetTime() / 1000.0);
 	float rotation2 = cos(timeGetTime() / 1000.0);
 
-	XMMATRIX matTigerTranslate = XMMatrixTranslation(0, 0, 0);
-	XMMATRIX matTigerRotate    = XMMatrixRotationY(g_f_TigerRY);
-	XMMATRIX matTigerScale     = XMMatrixScaling(2, 2, 2);
+	//Tiger Movement
+	XMMATRIX matTigerRotate = XMMatrixRotationY(g_Tiger.g_f_TigerRY);
+
+	XMVECTOR vecNewDir;
+	vecNewDir = XMVector3TransformCoord(g_Tiger.g_vecTigerInitDir, matTigerRotate);
+	vecNewDir = XMVector3Normalize(vecNewDir);
+
+	vecNewDir *= g_Tiger.g_f_TigerSpeed * fElapsedTime;
+	g_Tiger.g_f_TigerX += XMVectorGetX(vecNewDir); // Weird syntax; can't just
+	g_Tiger.g_f_TigerY += XMVectorGetY(vecNewDir); // use vector.x.
+	g_Tiger.g_f_TigerZ += XMVectorGetZ(vecNewDir);
+
+	XMMATRIX matTigerTranslate = XMMatrixTranslation(g_Tiger.g_f_TigerX, g_Tiger.g_f_TigerY, g_Tiger.g_f_TigerZ);
+	XMMATRIX matTigerScale     = XMMatrixScaling(1.5, 1.5, 1.5);
 	XMMATRIX matTigerWorld     = matTigerRotate * matTigerTranslate * matTigerScale;
     
 	XMMATRIX matWorldViewProjection;
@@ -734,22 +801,29 @@ void CALLBACK OnD3D11FrameRender( ID3D11Device* pd3dDevice, ID3D11DeviceContext*
 
 	//Create world matrix for wings
 
+	XMMATRIX matWingRotationZ = XMMatrixRotationZ(rotation);
+	XMMATRIX matWingScale = XMMatrixScaling(0.7f, 0.7f, 0.7f);
+
 	//LH Wing
 	XMMATRIX matWingLHTranslate = XMMatrixTranslation(0.1, 0.6, -0.8);
-	XMMATRIX matWingLHRotationZ = XMMatrixRotationZ(rotation);
-	XMMATRIX matWingLHScale = XMMatrixScaling(0.7f, 0.7f, 0.7f);
-	XMMATRIX matWingLHWorld = matWingLHRotationZ * matWingLHTranslate * matWingLHScale * matTigerWorld;
+	XMMATRIX matWingLHWorld = matWingRotationZ * matWingLHTranslate * matWingScale * matTigerWorld;
 
 	XMMATRIX matWingLHWorldViewProjection;
 	matWingLHWorldViewProjection = matWingLHWorld * matView * g_MatProjection;
 
 	//RH Wing
-	XMMATRIX matWingRHTranslate = XMMatrixTranslation(0, 0, 1.6);
+	XMMATRIX matWingRHTranslate = XMMatrixTranslation(-0.1, 0.4, -0.6);
 	XMMATRIX matWingRHRotateY = XMMatrixRotationY(XMConvertToRadians(180));
-	XMMATRIX matWingWorldRH = matWingRHTranslate * matWingLHWorld * matWingRHRotateY ;
+	XMMATRIX matWingWorldRH = matWingRotationZ * matWingRHRotateY * matWingScale * matWingRHTranslate * matTigerWorld;
 
 	XMMATRIX matWingRHWorldViewProjection;
 	matWingRHWorldViewProjection = matWingWorldRH * matView * g_MatProjection;
+
+	//Floor
+	XMMATRIX matFloorScale = XMMatrixScaling(1, 1, 1);
+	XMMATRIX matFloorWorld = matFloorScale;
+
+	XMMATRIX matFloorWorldViewProjection = matFloorWorld * matView * g_MatProjection;
 
 
 	//******************************************************************//
@@ -791,6 +865,7 @@ void CALLBACK OnD3D11FrameRender( ID3D11Device* pd3dDevice, ID3D11DeviceContext*
 	// be global, well defined on the heap anyway.  Not a local variable//
 	// it would seem.													//
 	//******************************************************************//
+
 	CB_VS_PER_OBJECT CBMatrices;
 	CBMatrices.matWorld = XMMatrixTranspose(matTigerWorld);
 	CBMatrices.matWorldViewProj = XMMatrixTranspose(matWorldViewProjection);
@@ -817,6 +892,12 @@ void CALLBACK OnD3D11FrameRender( ID3D11Device* pd3dDevice, ID3D11DeviceContext*
 
 	RenderMesh(pd3dImmediateContext, &g_MeshWingRH);
     
+	CBMatrices.matWorld = XMMatrixTranspose(matFloorWorld);
+	CBMatrices.matWorldViewProj = XMMatrixTranspose(matFloorWorldViewProjection);
+	pd3dImmediateContext->UpdateSubresource(g_pcbVSPerObject, 0, NULL, &CBMatrices, 0, 0);
+	pd3dImmediateContext->VSSetConstantBuffers(0, 1, &g_pcbVSPerObject);
+
+	RenderMesh(pd3dImmediateContext, &g_MeshFloorTile);
 	
 	//**************************************************************************//
 	// Render what is rather grandly called the head up display.				//
@@ -902,6 +983,7 @@ void CALLBACK OnD3D11DestroyDevice( void* pUserContext )
     g_MeshTiger.Destroy();
 	g_MeshWingLH.Destroy();
 	g_MeshWingRH.Destroy();
+	g_MeshFloorTile.Destroy();
                 
     SAFE_RELEASE( g_pVertexLayout11 );
     SAFE_RELEASE( g_pVertexBuffer );
