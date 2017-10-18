@@ -361,26 +361,30 @@ void CALLBACK OnFrameMove( double fTime, float fElapsedTime, void* pUserContext 
 	if (g_b_UpArrowDown)	g_Tiger.g_f_TigerSpeed += fElapsedTime;
 	if (g_b_DownArrowDown)	g_Tiger.g_f_TigerSpeed -= fElapsedTime;
 
+	//If no speed modification
 	if (!g_b_UpArrowDown && !g_b_DownArrowDown)
 	{
+		//If moving forward
 		if (g_Tiger.g_f_TigerSpeed >= 0)
 		{
+			//Halt if slow
 			if (g_Tiger.g_f_TigerSpeed - (fElapsedTime / 2) < 0)
 			{
 				g_Tiger.g_f_TigerSpeed = 0;
 			}
-			else
+			else //Slow down
 			{
 				g_Tiger.g_f_TigerSpeed -= (fElapsedTime / 2);
 			}
 		}
-		else
+		else //Moving Backwards
 		{
+			//Halt if slow
 			if (g_Tiger.g_f_TigerSpeed + (fElapsedTime / 2) > 0)
 			{
 				g_Tiger.g_f_TigerSpeed = 0;
 			}
-			else
+			else // Slow down
 			{
 				g_Tiger.g_f_TigerSpeed += (fElapsedTime / 2);
 			}
@@ -797,19 +801,20 @@ void CALLBACK OnD3D11FrameRender( ID3D11Device* pd3dDevice, ID3D11DeviceContext*
 
 	//Create world matrix for wings
 
+	XMMATRIX matWingRotationZ = XMMatrixRotationZ(rotation);
+	XMMATRIX matWingScale = XMMatrixScaling(0.7f, 0.7f, 0.7f);
+
 	//LH Wing
 	XMMATRIX matWingLHTranslate = XMMatrixTranslation(0.1, 0.6, -0.8);
-	XMMATRIX matWingLHRotationZ = XMMatrixRotationZ(rotation);
-	XMMATRIX matWingLHScale = XMMatrixScaling(0.7f, 0.7f, 0.7f);
-	XMMATRIX matWingLHWorld = matWingLHRotationZ * matWingLHTranslate * matWingLHScale * matTigerWorld;
+	XMMATRIX matWingLHWorld = matWingRotationZ * matWingLHTranslate * matWingScale * matTigerWorld;
 
 	XMMATRIX matWingLHWorldViewProjection;
 	matWingLHWorldViewProjection = matWingLHWorld * matView * g_MatProjection;
 
 	//RH Wing
-	XMMATRIX matWingRHTranslate = XMMatrixTranslation(0, 0, 1.6);
+	XMMATRIX matWingRHTranslate = XMMatrixTranslation(-0.1, 0.4, -0.6);
 	XMMATRIX matWingRHRotateY = XMMatrixRotationY(XMConvertToRadians(180));
-	XMMATRIX matWingWorldRH = matWingRHTranslate  * matWingRHRotateY * matWingLHRotationZ * matTigerWorld;
+	XMMATRIX matWingWorldRH = matWingRotationZ * matWingRHRotateY * matWingScale * matWingRHTranslate * matTigerWorld;
 
 	XMMATRIX matWingRHWorldViewProjection;
 	matWingRHWorldViewProjection = matWingWorldRH * matView * g_MatProjection;
