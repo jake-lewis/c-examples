@@ -97,7 +97,28 @@ ID3D11SamplerState         *g_pSamLinear      = NULL;
 // The only one I have coded is rotate about Y, we need an x, y, z		//
 // position and maybe rotates about other axes.							//
 //**********************************************************************//
-float		 g_f_TigerRY            = XMConvertToRadians(15);  //45º default
+struct TIGER
+{
+	float g_f_TigerRY;
+
+	float g_f_TigerX;
+	float g_f_TigerY;
+	float g_f_TigerZ;
+
+	float g_f_TigerSpeed;
+
+	XMVECTOR g_vecTigerInitDir;
+
+	TIGER() : 
+		g_f_TigerRY(XMConvertToRadians(15)), 
+		g_f_TigerX(0), 
+		g_f_TigerY(0), 
+		g_f_TigerZ(0), 
+		g_f_TigerSpeed(0), 
+		g_vecTigerInitDir(XMVectorSet(0, 0, -1, 0)) {}
+};
+
+TIGER g_Tiger;
 
 bool		 g_b_LeftArrowDown      = false;	//Status of keyboard.  Thess are set
 bool		 g_b_RightArrowDown     = false;	//in the callback KeyboardProc(), and 
@@ -335,8 +356,37 @@ bool CALLBACK ModifyDeviceSettings( DXUTDeviceSettings* pDeviceSettings, void* p
 //**************************************************************************//
 void CALLBACK OnFrameMove( double fTime, float fElapsedTime, void* pUserContext )
 {
-	if (g_b_LeftArrowDown)  g_f_TigerRY -= fElapsedTime*3;	// Frame rate 
-	if (g_b_RightArrowDown) g_f_TigerRY += fElapsedTime*3;	// independent.
+	if (g_b_LeftArrowDown)  g_Tiger.g_f_TigerRY -= fElapsedTime*3;	// Frame rate 
+	if (g_b_RightArrowDown) g_Tiger.g_f_TigerRY += fElapsedTime*3;	// independent.
+	if (g_b_UpArrowDown)	g_Tiger.g_f_TigerSpeed += fElapsedTime;
+	if (g_b_DownArrowDown)	g_Tiger.g_f_TigerSpeed -= fElapsedTime;
+
+	if (!g_b_UpArrowDown && !g_b_DownArrowDown)
+	{
+		if (g_Tiger.g_f_TigerSpeed >= 0)
+		{
+			if (g_Tiger.g_f_TigerSpeed - (fElapsedTime / 2) < 0)
+			{
+				g_Tiger.g_f_TigerSpeed = 0;
+			}
+			else
+			{
+				g_Tiger.g_f_TigerSpeed -= (fElapsedTime / 2);
+			}
+		}
+		else
+		{
+			if (g_Tiger.g_f_TigerSpeed + (fElapsedTime / 2) > 0)
+			{
+				g_Tiger.g_f_TigerSpeed = 0;
+			}
+			else
+			{
+				g_Tiger.g_f_TigerSpeed += (fElapsedTime / 2);
+			}
+		}
+		
+	}
 }
 
 
@@ -726,8 +776,19 @@ void CALLBACK OnD3D11FrameRender( ID3D11Device* pd3dDevice, ID3D11DeviceContext*
 	float rotation = sin(timeGetTime() / 1000.0);
 	float rotation2 = cos(timeGetTime() / 1000.0);
 
-	XMMATRIX matTigerTranslate = XMMatrixTranslation(0, 0, 0);
-	XMMATRIX matTigerRotate    = XMMatrixRotationY(g_f_TigerRY);
+	//Tiger Movement
+	XMMATRIX matTigerRotate = XMMatrixRotationY(g_Tiger.g_f_TigerRY);
+
+	XMVECTOR vecNewDir;
+	vecNewDir = XMVector3TransformCoord(g_Tiger.g_vecTigerInitDir, matTigerRotate);
+	vecNewDir = XMVector3Normalize(vecNewDir);
+
+	vecNewDir *= g_Tiger.g_f_TigerSpeed * fElapsedTime;
+	g_Tiger.g_f_TigerX += XMVectorGetX(vecNewDir); // Weird syntax; can't just
+	g_Tiger.g_f_TigerY += XMVectorGetY(vecNewDir); // use vector.x.
+	g_Tiger.g_f_TigerZ += XMVectorGetZ(vecNewDir);
+
+	XMMATRIX matTigerTranslate = XMMatrixTranslation(g_Tiger.g_f_TigerX, g_Tiger.g_f_TigerY, g_Tiger.g_f_TigerZ);
 	XMMATRIX matTigerScale     = XMMatrixScaling(1.5, 1.5, 1.5);
 	XMMATRIX matTigerWorld     = matTigerRotate * matTigerTranslate * matTigerScale;
     
@@ -748,7 +809,7 @@ void CALLBACK OnD3D11FrameRender( ID3D11Device* pd3dDevice, ID3D11DeviceContext*
 	//RH Wing
 	XMMATRIX matWingRHTranslate = XMMatrixTranslation(0, 0, 1.6);
 	XMMATRIX matWingRHRotateY = XMMatrixRotationY(XMConvertToRadians(180));
-	XMMATRIX matWingWorldRH = matWingRHTranslate * matWingLHWorld * matWingRHRotateY ;
+	XMMATRIX matWingWorldRH = matWingRHTranslate  * matWingRHRotateY * matWingLHRotationZ * matTigerWorld;
 
 	XMMATRIX matWingRHWorldViewProjection;
 	matWingRHWorldViewProjection = matWingWorldRH * matView * g_MatProjection;
@@ -799,6 +860,7 @@ void CALLBACK OnD3D11FrameRender( ID3D11Device* pd3dDevice, ID3D11DeviceContext*
 	// be global, well defined on the heap anyway.  Not a local variable//
 	// it would seem.													//
 	//******************************************************************//
+
 	CB_VS_PER_OBJECT CBMatrices;
 	CBMatrices.matWorld = XMMatrixTranspose(matTigerWorld);
 	CBMatrices.matWorldViewProj = XMMatrixTranspose(matWorldViewProjection);
