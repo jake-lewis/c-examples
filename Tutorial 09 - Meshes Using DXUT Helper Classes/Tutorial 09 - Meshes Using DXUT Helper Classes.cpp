@@ -81,6 +81,7 @@ int							g_height = 600;;
 CDXUTSDKMesh                g_MeshTiger;			// Wot, not a pointer type?
 CDXUTSDKMesh				g_MeshWingLH;
 CDXUTSDKMesh				g_MeshWingRH;
+CDXUTSDKMesh				g_MeshFloorTile;
 
 XMMATRIX					g_MatProjection;
 
@@ -601,6 +602,7 @@ HRESULT CALLBACK OnD3D11CreateDevice( ID3D11Device* pd3dDevice, const DXGI_SURFA
     V_RETURN( g_MeshTiger.Create( pd3dDevice, L"Media\\tiger\\tiger.sdkmesh", true ) );
 	V_RETURN( g_MeshWingLH.Create(pd3dDevice, L"Media\\wing\\wing.sdkmesh", true));
 	V_RETURN(g_MeshWingRH.Create(pd3dDevice, L"Media\\wing\\wing.sdkmesh", true));
+	V_RETURN(g_MeshFloorTile.Create(pd3dDevice, L"Media\\floor\\seafloor.sdkmesh", true));
 
 
 	// Create a sampler state
@@ -726,7 +728,7 @@ void CALLBACK OnD3D11FrameRender( ID3D11Device* pd3dDevice, ID3D11DeviceContext*
 
 	XMMATRIX matTigerTranslate = XMMatrixTranslation(0, 0, 0);
 	XMMATRIX matTigerRotate    = XMMatrixRotationY(g_f_TigerRY);
-	XMMATRIX matTigerScale     = XMMatrixScaling(2, 2, 2);
+	XMMATRIX matTigerScale     = XMMatrixScaling(1.5, 1.5, 1.5);
 	XMMATRIX matTigerWorld     = matTigerRotate * matTigerTranslate * matTigerScale;
     
 	XMMATRIX matWorldViewProjection;
@@ -750,6 +752,12 @@ void CALLBACK OnD3D11FrameRender( ID3D11Device* pd3dDevice, ID3D11DeviceContext*
 
 	XMMATRIX matWingRHWorldViewProjection;
 	matWingRHWorldViewProjection = matWingWorldRH * matView * g_MatProjection;
+
+	//Floor
+	XMMATRIX matFloorScale = XMMatrixScaling(1, 1, 1);
+	XMMATRIX matFloorWorld = matFloorScale;
+
+	XMMATRIX matFloorWorldViewProjection = matFloorWorld * matView * g_MatProjection;
 
 
 	//******************************************************************//
@@ -817,6 +825,12 @@ void CALLBACK OnD3D11FrameRender( ID3D11Device* pd3dDevice, ID3D11DeviceContext*
 
 	RenderMesh(pd3dImmediateContext, &g_MeshWingRH);
     
+	CBMatrices.matWorld = XMMatrixTranspose(matFloorWorld);
+	CBMatrices.matWorldViewProj = XMMatrixTranspose(matFloorWorldViewProjection);
+	pd3dImmediateContext->UpdateSubresource(g_pcbVSPerObject, 0, NULL, &CBMatrices, 0, 0);
+	pd3dImmediateContext->VSSetConstantBuffers(0, 1, &g_pcbVSPerObject);
+
+	RenderMesh(pd3dImmediateContext, &g_MeshFloorTile);
 	
 	//**************************************************************************//
 	// Render what is rather grandly called the head up display.				//
@@ -902,6 +916,7 @@ void CALLBACK OnD3D11DestroyDevice( void* pUserContext )
     g_MeshTiger.Destroy();
 	g_MeshWingLH.Destroy();
 	g_MeshWingRH.Destroy();
+	g_MeshFloorTile.Destroy();
                 
     SAFE_RELEASE( g_pVertexLayout11 );
     SAFE_RELEASE( g_pVertexBuffer );
