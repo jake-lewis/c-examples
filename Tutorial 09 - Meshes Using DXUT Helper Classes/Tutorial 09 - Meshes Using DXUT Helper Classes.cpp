@@ -654,7 +654,7 @@ HRESULT CALLBACK OnD3D11CreateDevice( ID3D11Device* pd3dDevice, const DXGI_SURFA
 	g_MatProjection = XMMatrixPerspectiveFovLH( XM_PIDIV2,				// Field of view (pi / 2 radians, or 90 degrees
 											 g_width / (FLOAT) g_height, // Aspect ratio.
 											 0.01f,						// Near clipping plane.
-											 100.0f );					// Far clipping plane.
+											 500.0f );					// Far clipping plane.
 
 
 	//**************************************************************************//
@@ -765,9 +765,6 @@ void CALLBACK OnD3D11FrameRender( ID3D11Device* pd3dDevice, ID3D11DeviceContext*
 	// hence the conversion.  And a translate.							//
 	//******************************************************************//
 
-
-	float rotation = sin(timeGetTime() / 500.0);
-	float rotation2 = cos(timeGetTime() / 500.0);
 	float tigerScaleConstant = 1.5f;
 	int arseHeightOffset = 2;
 	float rotation = sin(timeGetTime() / 300.0);
@@ -842,8 +839,8 @@ void CALLBACK OnD3D11FrameRender( ID3D11Device* pd3dDevice, ID3D11DeviceContext*
 	XMMATRIX matFloorWorldViewProjection = matFloorWorld * matView * g_MatProjection;
 
 	//Skybox
-	XMMATRIX matSkyboxScale		= XMMatrixScaling(0.03f, 0.03f, 0.03f);
-	XMMATRIX matSkyboxWorld		= matSkyboxScale;
+	XMMATRIX matSkyboxScale		= XMMatrixScaling(0.05f, 0.05f, 0.05f);
+	XMMATRIX matSkyboxWorld		= matSkyboxScale * XMMatrixTranslationFromVector(At);
 
 	XMMATRIX matSkyboxWorldViewProjection = matSkyboxWorld * matView * g_MatProjection;
 
