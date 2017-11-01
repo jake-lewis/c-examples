@@ -750,25 +750,6 @@ void CALLBACK OnD3D11FrameRender( ID3D11Device* pd3dDevice, ID3D11DeviceContext*
     ID3D11DepthStencilView* pDSV = DXUTGetD3D11DepthStencilView();
     pd3dImmediateContext->ClearDepthStencilView( pDSV, D3D11_CLEAR_DEPTH, 1.0, 0 );
 
-
-	//**************************************************************************//
-    // Initialize the view matrix.  What you do to the viewer matrix moves the  //
-	// viewer, or course.														//
-	//																			//
-	// The viewer matrix is created every frame here, which looks silly as the	//
-	// viewer never moves.  However in general your viewer does move.			//
-	//**************************************************************************//
-	XMVECTOR Eye = XMVectorSet( 0.0f, 1.0f, -5.0f, 0.0f );
-	XMVECTOR At  = XMVectorSet( 0.0f, 0.0f, 0.0f, 0.0f );
-	XMVECTOR Up  = XMVectorSet( 0.0f, 1.0f, 0.0f, 0.0f );
-	
-	XMMATRIX matView;
-	matView = XMMatrixLookAtLH( Eye,	// The eye, or viewer's position.
-								At,		// The look at point.
-							    Up );	// Which way is up.
-
-
-
 	
 	//******************************************************************//
 	// Create the world matrix for the tiger: just a rotate around	    //
@@ -777,8 +758,10 @@ void CALLBACK OnD3D11FrameRender( ID3D11Device* pd3dDevice, ID3D11DeviceContext*
 	//******************************************************************//
 
 
-	float rotation = sin(timeGetTime() / 1000.0);
-	float rotation2 = cos(timeGetTime() / 1000.0);
+	float rotation = sin(timeGetTime() / 500.0);
+	float rotation2 = cos(timeGetTime() / 500.0);
+	float tigerScaleConstant = 1.5f;
+	int arseHeightOffset = 2;
 
 	//Tiger Movement
 	XMMATRIX matTigerRotate = XMMatrixRotationY(g_Tiger.g_f_TigerRY);
@@ -787,16 +770,39 @@ void CALLBACK OnD3D11FrameRender( ID3D11Device* pd3dDevice, ID3D11DeviceContext*
 	vecNewDir = XMVector3TransformCoord(g_Tiger.g_vecTigerInitDir, matTigerRotate);
 	vecNewDir = XMVector3Normalize(vecNewDir);
 
+	XMVECTOR vecArse = vecNewDir * -3;
+
 	vecNewDir *= g_Tiger.g_f_TigerSpeed * fElapsedTime;
 	g_Tiger.g_f_TigerX += XMVectorGetX(vecNewDir); // Weird syntax; can't just
 	g_Tiger.g_f_TigerY += XMVectorGetY(vecNewDir); // use vector.x.
 	g_Tiger.g_f_TigerZ += XMVectorGetZ(vecNewDir);
 
 	XMMATRIX matTigerTranslate = XMMatrixTranslation(g_Tiger.g_f_TigerX, g_Tiger.g_f_TigerY, g_Tiger.g_f_TigerZ);
-	XMMATRIX matTigerScale     = XMMatrixScaling(1.5, 1.5, 1.5);
+	XMMATRIX matTigerScale     = XMMatrixScaling(tigerScaleConstant, tigerScaleConstant, tigerScaleConstant);
 	XMMATRIX matTigerWorld     = matTigerRotate * matTigerTranslate * matTigerScale;
     
 	XMMATRIX matWorldViewProjection;
+
+	//**************************************************************************//
+	// Initialize the view matrix.  What you do to the viewer matrix moves the  //
+	// viewer, or course.														//
+	//																			//
+	// The viewer matrix is created every frame here, which looks silly as the	//
+	// viewer never moves.  However in general your viewer does move.			//
+	//**************************************************************************//
+	XMVECTOR Eye = XMVectorSet(
+		g_Tiger.g_f_TigerX + XMVectorGetX(vecArse), 
+		g_Tiger.g_f_TigerY + XMVectorGetY(vecArse) + arseHeightOffset,
+		g_Tiger.g_f_TigerZ + XMVectorGetZ(vecArse),
+		0) * tigerScaleConstant;
+	XMVECTOR At = XMVectorSet(g_Tiger.g_f_TigerX, g_Tiger.g_f_TigerY, g_Tiger.g_f_TigerZ, 0.0f) * tigerScaleConstant;
+	XMVECTOR Up = XMVectorSet(0.0f, 1.0f, 0.0f, 0.0f);
+
+	XMMATRIX matView;
+	matView = XMMatrixLookAtLH(Eye,	// The eye, or viewer's position.
+		At,		// The look at point.
+		Up);	// Which way is up.
+
 	matWorldViewProjection = matTigerWorld * matView * g_MatProjection;
 
 	//Create world matrix for wings
