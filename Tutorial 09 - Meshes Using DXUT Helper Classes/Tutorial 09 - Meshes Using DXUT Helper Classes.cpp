@@ -82,6 +82,7 @@ CDXUTSDKMesh                g_MeshTiger;			// Wot, not a pointer type?
 CDXUTSDKMesh				g_MeshWingLH;
 CDXUTSDKMesh				g_MeshWingRH;
 CDXUTSDKMesh				g_MeshFloorTile;
+CDXUTSDKMesh				g_MeshCloudBox;
 
 XMMATRIX					g_MatProjection;
 
@@ -90,6 +91,7 @@ ID3D11Buffer               *g_pVertexBuffer   = NULL;
 ID3D11Buffer               *g_pIndexBuffer    = NULL;
 ID3D11VertexShader         *g_pVertexShader   = NULL;
 ID3D11PixelShader          *g_pPixelShader    = NULL;
+ID3D11PixelShader		   *g_pPixelShaderNoLighting = NULL;
 ID3D11SamplerState         *g_pSamLinear      = NULL;
 
 //**********************************************************************//
@@ -241,7 +243,7 @@ void InitApp();
 void RenderText();
 void charStrToWideChar(WCHAR *dest, char *source);
 void RenderMesh (ID3D11DeviceContext* pd3dImmediateContext, CDXUTSDKMesh *toRender);
-
+void RenderMesh(ID3D11DeviceContext* pd3dImmediateContext, CDXUTSDKMesh *toRender, ID3D11PixelShader *pixelShader);
 
 
 
@@ -602,6 +604,8 @@ HRESULT CALLBACK OnD3D11CreateDevice( ID3D11Device* pd3dDevice, const DXGI_SURFA
     ID3DBlob* pPixelShaderBuffer = NULL;
     V_RETURN( CompileShaderFromFile( L"Tutorial 09 - Meshes Using DXUT Helper Classes_PS.hlsl", "PS_DXUTSDKMesh", "ps_4_0", &pPixelShaderBuffer ) );
 
+	ID3DBlob* pPixelNoLightingBuffer = NULL;
+	V_RETURN(CompileShaderFromFile(L"Tutorial 09 - Meshes Using DXUT Helper Classes_PS.hlsl", "PS_NOLIGHTING_DXUTSDKMesh", "ps_4_0", &pPixelNoLightingBuffer));
     
 	
 	//**********************************************************************//
@@ -613,6 +617,9 @@ HRESULT CALLBACK OnD3D11CreateDevice( ID3D11Device* pd3dDevice, const DXGI_SURFA
     V_RETURN( pd3dDevice->CreatePixelShader( pPixelShaderBuffer->GetBufferPointer(),
                                              pPixelShaderBuffer->GetBufferSize(), NULL, &g_pPixelShader ) );
     DXUT_SetDebugName( g_pPixelShader, "PS_DXUTSDKMesh" );
+	V_RETURN(pd3dDevice->CreatePixelShader(pPixelNoLightingBuffer->GetBufferPointer(),
+		pPixelNoLightingBuffer->GetBufferSize(), NULL, &g_pPixelShaderNoLighting));
+	DXUT_SetDebugName(g_pPixelShaderNoLighting, "PS_NoLighting_DXUTSDKMesh");
 
 	
 	
@@ -657,6 +664,7 @@ HRESULT CALLBACK OnD3D11CreateDevice( ID3D11Device* pd3dDevice, const DXGI_SURFA
 	V_RETURN( g_MeshWingLH.Create(pd3dDevice, L"Media\\wing\\wing.sdkmesh", true));
 	V_RETURN(g_MeshWingRH.Create(pd3dDevice, L"Media\\wing\\wing.sdkmesh", true));
 	V_RETURN(g_MeshFloorTile.Create(pd3dDevice, L"Media\\floor\\seafloor.sdkmesh", true));
+	V_RETURN(g_MeshCloudBox.Create(pd3dDevice, L"Media\\cloudbox\\skysphere.sdkmesh", true));
 
 
 	// Create a sampler state
@@ -777,8 +785,8 @@ void CALLBACK OnD3D11FrameRender( ID3D11Device* pd3dDevice, ID3D11DeviceContext*
 	//******************************************************************//
 
 
-	float rotation = sin(timeGetTime() / 1000.0);
-	float rotation2 = cos(timeGetTime() / 1000.0);
+	float rotation = sin(timeGetTime() / 300.0);
+	float rotation2 = cos(timeGetTime() / 300.0);
 
 	//Tiger Movement
 	XMMATRIX matTigerRotate = XMMatrixRotationY(g_Tiger.g_f_TigerRY);
@@ -825,6 +833,11 @@ void CALLBACK OnD3D11FrameRender( ID3D11Device* pd3dDevice, ID3D11DeviceContext*
 
 	XMMATRIX matFloorWorldViewProjection = matFloorWorld * matView * g_MatProjection;
 
+	//Skybox
+	XMMATRIX matSkyboxScale		= XMMatrixScaling(0.03f, 0.03f, 0.03f);
+	XMMATRIX matSkyboxWorld		= matSkyboxScale;
+
+	XMMATRIX matSkyboxWorldViewProjection = matSkyboxWorld * matView * g_MatProjection;
 
 	//******************************************************************//
 	// Lighting.  Ambient light and a light direction, above, to the	//
@@ -898,6 +911,13 @@ void CALLBACK OnD3D11FrameRender( ID3D11Device* pd3dDevice, ID3D11DeviceContext*
 	pd3dImmediateContext->VSSetConstantBuffers(0, 1, &g_pcbVSPerObject);
 
 	RenderMesh(pd3dImmediateContext, &g_MeshFloorTile);
+
+	CBMatrices.matWorld = XMMatrixTranspose(matSkyboxWorld);
+	CBMatrices.matWorldViewProj = XMMatrixTranspose(matSkyboxWorldViewProjection);
+	pd3dImmediateContext->UpdateSubresource(g_pcbVSPerObject, 0, NULL, &CBMatrices, 0, 0);
+	pd3dImmediateContext->VSSetConstantBuffers(0, 1, &g_pcbVSPerObject);
+
+	RenderMesh(pd3dImmediateContext, &g_MeshCloudBox, g_pPixelShaderNoLighting);
 	
 	//**************************************************************************//
 	// Render what is rather grandly called the head up display.				//
@@ -909,15 +929,21 @@ void CALLBACK OnD3D11FrameRender( ID3D11Device* pd3dDevice, ID3D11DeviceContext*
     DXUT_EndPerfEvent();
 }
 
-
-
+//Render a mesh using the default Pixel Shader
+void RenderMesh(ID3D11DeviceContext *pContext,
+				CDXUTSDKMesh         *toRender)
+{
+	RenderMesh(pContext, toRender, g_pPixelShader);
+}
 
 
 //**************************************************************************//
-// Render a CDXUTSDKMesh, using the Device Context specified.				//
+// Overloaded: Render a CDXUTSDKMesh, using the Device Context specified	//
+//and specific Pixel Shader.												//
 //**************************************************************************//
 void RenderMesh (ID3D11DeviceContext *pContext, 
-				 CDXUTSDKMesh         *toRender)
+				 CDXUTSDKMesh         *toRender,
+				 ID3D11PixelShader	*pixelShader)
 {
 	//Get the mesh
     //IA setup
@@ -933,7 +959,7 @@ void RenderMesh (ID3D11DeviceContext *pContext,
 
     // Set the shaders
     pContext->VSSetShader( g_pVertexShader, NULL, 0 );
-    pContext->PSSetShader( g_pPixelShader,  NULL, 0 );
+    pContext->PSSetShader( pixelShader,  NULL, 0 );
     
 	for( UINT subset = 0; subset < toRender->GetNumSubsets( 0 ); ++subset )
     {
@@ -984,12 +1010,14 @@ void CALLBACK OnD3D11DestroyDevice( void* pUserContext )
 	g_MeshWingLH.Destroy();
 	g_MeshWingRH.Destroy();
 	g_MeshFloorTile.Destroy();
+	g_MeshCloudBox.Destroy();
                 
     SAFE_RELEASE( g_pVertexLayout11 );
     SAFE_RELEASE( g_pVertexBuffer );
     SAFE_RELEASE( g_pIndexBuffer );
     SAFE_RELEASE( g_pVertexShader );
     SAFE_RELEASE( g_pPixelShader );
+	SAFE_RELEASE(g_pPixelShaderNoLighting);
     SAFE_RELEASE( g_pSamLinear );
 
     SAFE_RELEASE( g_pcbVSPerObject );
