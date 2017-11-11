@@ -174,7 +174,7 @@ void Render();
 void charStrToWideChar(WCHAR *dest, char *source);
 void XMFLOAT3normalise(XMFLOAT3 *toNormalise);
 SortOfMeshSubset *LoadMesh(LPSTR filename);
-
+void ParseMtlFile(WCHAR *mtlPath);
 
 
 
@@ -598,7 +598,7 @@ HRESULT InitDevice()
 	// we can do this only once.  Try to minimise the number of times you put	//
 	// textures into video memory, there is quite an overhead in doing so.		//
 	//**************************************************************************//
-	g_pImmediateContext->PSSetShaderResources( 0, 1, &g_pTextureResourceView );
+	//g_pImmediateContext->PSSetShaderResources( 0, 1, &g_pTextureResourceView );
 
 
     // Create the sample state
@@ -877,7 +877,7 @@ struct VertexXYZ
 //																			//
 // ...And only works with meshes in exactly the right format.				//
 //**************************************************************************//
-SortOfMeshSubset *LoadMesh(LPSTR filename)
+SortOfMeshSubset *LoadMesh(LPSTR objFilePath)
 {
 	std::wifstream          fileStream;
 	std::wstring            line;
@@ -886,7 +886,7 @@ SortOfMeshSubset *LoadMesh(LPSTR filename)
 	std::vector <VertexXYZ> vectorNormal(0);
 	std::vector <USHORT>    vectorIndices(0);
 
-	fileStream.open(filename);
+	fileStream.open(objFilePath);
 	bool isOpen = fileStream.is_open();		//debugging only.
 
 
@@ -894,16 +894,67 @@ SortOfMeshSubset *LoadMesh(LPSTR filename)
 	{
 		line = TrimStart(line);
 		
+		//Get name of .mtl file
 		if (line.compare(0, 7, L"mtllib ") == 0)
 		{
 			WCHAR first[7];
-			WCHAR texFileName[200];
+			WCHAR mtlFileName[200];
 
 			WCHAR oldStyleStr[200];
 			wcscpy(oldStyleStr, line.c_str());
-			swscanf(oldStyleStr, L"%6s%s", first, texFileName);
+			swscanf(oldStyleStr, L"%6s%s", first, mtlFileName);
 			
-			int len = 3;
+			//get length of mtlFileName
+			int mtlNameLength = 0;
+			for (int i = 0; i < 200; i++)
+			{
+				if (mtlFileName[i] != NULL)
+				{
+					mtlNameLength++;
+				}
+				else
+				{
+					break;
+				}
+			}
+
+			//Get length of the obj file path
+			int objFilePathLength = strlen(objFilePath);
+
+			//get length of obj file name
+			int fileNameLength = 0;
+			for (int i = objFilePathLength -1; i >= 0; i--)
+			{
+				if (objFilePath[i] == '\\')
+				{
+					fileNameLength = objFilePathLength - (i + 1);
+					break;
+				}
+			}
+
+			//Get the path to parent folder of the obj file
+			WCHAR objParentPath[200];
+
+			for (int i = 0; i < 200; i++)
+			{
+				if (i < objFilePathLength - fileNameLength)
+				{
+					objParentPath[i] = objFilePath[i];
+				}
+				else
+				{
+					objParentPath[i] = NULL;
+					break;
+				}
+				
+			}
+
+			//I hate c++ strings
+			//Parse .mtl file
+			WCHAR mtlFullPath[200];
+			wcscpy(mtlFullPath, objParentPath);
+			wcscat(mtlFullPath, mtlFileName);
+			ParseMtlFile(mtlFullPath);
 		}
 
 		//******************************************************************//
@@ -1027,3 +1078,13 @@ SortOfMeshSubset *LoadMesh(LPSTR filename)
 	return mesh;
 }
 
+void ParseMtlFile(WCHAR *mtlPath)
+{
+	D3DX11CreateShaderResourceViewFromFile(g_pd3dDevice,
+		L"Media\\pig\\pig_d.jpg",
+		NULL, NULL,
+		&g_pTextureResourceView,		// This is returned.
+		NULL);
+
+	g_pImmediateContext->PSSetShaderResources(0, 1, &g_pTextureResourceView);
+}
