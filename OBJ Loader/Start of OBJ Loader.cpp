@@ -60,7 +60,7 @@ struct SimpleVertex
 {
     XMFLOAT3 Pos;	//Why not a float4?  See the shader strucrure.  Any thoughts?  Nigel
 	XMFLOAT3 VecNormal;
-    XMFLOAT2 TexUV;
+    XMFLOAT2 Tex;
 };
 
 
@@ -71,8 +71,8 @@ struct SimpleVertex
 //**************************************************************************//
 struct SortOfMeshSubset
 {
-	SimpleVertex *vertices;
-	USHORT       *indexes;
+	std::vector <SimpleVertex> *vertices;
+	std::vector <USHORT>  *indexes;
 	USHORT       numVertices;
 	USHORT       numIndices;
 };
@@ -553,8 +553,8 @@ HRESULT InitDevice()
 	// Can this be true?  Nigel is caught cleaning up after himself.  Once the  //
 	// vertex and index buffers are created, this structure is no longer needed.//
 	//**************************************************************************//
-	delete sortOfMesh->indexes;		// Delete the two arrays.
-	delete sortOfMesh->vertices;
+	sortOfMesh->indexes->clear();		// Delete the two arrays.
+	sortOfMesh->vertices->clear();
 	delete sortOfMesh;				// Then delete  sortOfMesh
 
 
@@ -585,7 +585,7 @@ HRESULT InitDevice()
 	// Load the texture into "ordinary" RAM.									//
 	//**************************************************************************//
 	hr = D3DX11CreateShaderResourceViewFromFile( g_pd3dDevice, 
-												 L"Media\\woodtexture.jpg", 
+												 L"Media\\pig\\pig_d.jpg", 
 												 NULL, NULL, 
 												 &g_pTextureResourceView,		// This is returned.
 												 NULL );
@@ -598,7 +598,7 @@ HRESULT InitDevice()
 	// we can do this only once.  Try to minimise the number of times you put	//
 	// textures into video memory, there is quite an overhead in doing so.		//
 	//**************************************************************************//
-	//g_pImmediateContext->PSSetShaderResources( 0, 1, &g_pTextureResourceView );
+	g_pImmediateContext->PSSetShaderResources( 0, 1, &g_pTextureResourceView );
 
 
     // Create the sample state
@@ -949,7 +949,6 @@ SortOfMeshSubset *LoadMesh(LPSTR objFilePath)
 				
 			}
 
-			//I hate c++ strings
 			//Parse .mtl file
 			WCHAR mtlFullPath[200];
 			wcscpy(mtlFullPath, objParentPath);
@@ -1055,36 +1054,53 @@ SortOfMeshSubset *LoadMesh(LPSTR objFilePath)
 	SortOfMeshSubset *mesh  = new SortOfMeshSubset;
 	
 	mesh->numVertices = (USHORT) vectorVertices.size();
-	mesh->vertices    = new SimpleVertex[mesh->numVertices];
+	std::vector <SimpleVertex> tempVertices(mesh->numVertices);
+	mesh->vertices = &tempVertices;
+
 	for (int i = 0; i < mesh->numVertices; i++)
 	{
-		mesh->vertices[i].Pos.x			= vectorVertices[i].x;
-		mesh->vertices[i].Pos.y			= vectorVertices[i].y;
-		mesh->vertices[i].Pos.z			= vectorVertices[i].z;
-		mesh->vertices[i].VecNormal.x	= vectorNormal[i].x;
-		mesh->vertices[i].VecNormal.y	= vectorNormal[i].y;
-		mesh->vertices[i].VecNormal.z	= vectorNormal[i].z;
-		mesh->vertices[i].TexUV.x		= vectorTextureVertices[i].x;
-		mesh->vertices[i].TexUV.y		= vectorTextureVertices[i].y;
+		mesh->vertices->at(i).Pos.x			= vectorVertices[i].x;
+		mesh->vertices->at(i).Pos.y			= vectorVertices[i].y;
+		mesh->vertices->at(i).Pos.z			= vectorVertices[i].z;
+		mesh->vertices->at(i).VecNormal.x	= vectorNormal[i].x;
+		mesh->vertices->at(i).VecNormal.y	= vectorNormal[i].y;
+		mesh->vertices->at(i).VecNormal.z	= vectorNormal[i].z;
+		mesh->vertices->at(i).Tex.x		= vectorTextureVertices[i].x;
+		mesh->vertices->at(i).Tex.y		= vectorTextureVertices[i].y;
 	}
 
 	mesh->numIndices = (USHORT) vectorIndices.size();
-	mesh->indexes    = new USHORT[mesh->numIndices];
-	for (int i = 0; i < mesh->numIndices; i++)
+	std::vector <USHORT> tempIndices(mesh->numIndices);
+	mesh->indexes = &tempIndices;
+
+	for (int i = 0; i < mesh->numIndices - 2; i++)
 	{
-		mesh->indexes[i] = vectorIndices[i];
+		mesh->indexes->at(i) = vectorIndices[i];
 	}
 	
+	//Close filestream, not sure if this was supposed to be left open?
+	fileStream.close();
+
 	return mesh;
 }
 
 void ParseMtlFile(WCHAR *mtlPath)
 {
-	D3DX11CreateShaderResourceViewFromFile(g_pd3dDevice,
-		L"Media\\pig\\pig_d.jpg",
-		NULL, NULL,
-		&g_pTextureResourceView,		// This is returned.
-		NULL);
+	std::wifstream          fileStream;
+	std::wstring            line;
 
-	g_pImmediateContext->PSSetShaderResources(0, 1, &g_pTextureResourceView);
+	fileStream.open(mtlPath);
+
+
+	while (std::getline(fileStream, line))
+	{
+		line = TrimStart(line);
+
+		if (line.compare(0, 7, L"mtllib ") == 0)
+		{
+
+		}
+	}
+
+	fileStream.close();
 }
