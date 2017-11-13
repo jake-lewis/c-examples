@@ -63,7 +63,18 @@ struct SimpleVertex
     XMFLOAT2 Tex;
 };
 
-
+struct Face
+{
+	USHORT *v1;
+	USHORT *v2;
+	USHORT *v3;
+	USHORT *vt1;
+	USHORT *vt2;
+	USHORT *vt3;
+	USHORT *vn1;
+	USHORT *vn2;
+	USHORT *vn3;
+};
 
 
 //**************************************************************************//
@@ -72,7 +83,7 @@ struct SimpleVertex
 struct SortOfMeshSubset
 {
 	std::vector <SimpleVertex> *vertices;
-	std::vector <USHORT>  *indexes;
+	std::vector <Face>  *indexes;
 	USHORT       numVertices;
 	USHORT       numIndices;
 };
@@ -496,7 +507,7 @@ HRESULT InitDevice()
 	//**************************************************************************//	
 	//SortOfMeshSubset *sortOfMesh = LoadMesh("Media\\Cup\\Cup.obj");
 	//SortOfMeshSubset *sortOfMesh = LoadMesh("Media\\Textured_triangulated_Cube\\cube.obj");
-	SortOfMeshSubset *sortOfMesh = LoadMesh("Media\\pig\\pig.obj");
+	SortOfMeshSubset *sortOfMesh = LoadMesh("Media\\Textured_triangulated_Cube\\cube.obj");
 
 	//**************************************************************************//
 	// Create the vertex buffer.												//
@@ -585,7 +596,7 @@ HRESULT InitDevice()
 	// Load the texture into "ordinary" RAM.									//
 	//**************************************************************************//
 	hr = D3DX11CreateShaderResourceViewFromFile( g_pd3dDevice, 
-												 L"Media\\pig\\pig_d.jpg", 
+												 L"Media\\Textured_triangulated_Cube\\cube.jpg", 
 												 NULL, NULL, 
 												 &g_pTextureResourceView,		// This is returned.
 												 NULL );
@@ -1052,10 +1063,17 @@ SortOfMeshSubset *LoadMesh(LPSTR objFilePath)
 	// See abobe wih the -1s.  Sorted?									//
 	//******************************************************************//
 	SortOfMeshSubset *mesh  = new SortOfMeshSubset;
-	
+	std::vector <Face> faces(vectorIndices.size() / 3);
+
+
 	mesh->numVertices = (USHORT) vectorVertices.size();
 	std::vector <SimpleVertex> tempVertices(mesh->numVertices);
 	mesh->vertices = &tempVertices;
+
+	for (int i = 0; i < mesh->numVertices; i++)
+	{
+		mesh->vertices->at(i) = tempVertices.at(i);
+	}
 
 	for (int i = 0; i < mesh->numVertices; i++)
 	{
@@ -1069,15 +1087,17 @@ SortOfMeshSubset *LoadMesh(LPSTR objFilePath)
 		mesh->vertices->at(i).Tex.y		= vectorTextureVertices[i].y;
 	}
 
-	mesh->numIndices = (USHORT) vectorIndices.size();
-	std::vector <USHORT> tempIndices(mesh->numIndices);
-	mesh->indexes = &tempIndices;
-
-	for (int i = 0; i < mesh->numIndices - 2; i++)
-	{
-		mesh->indexes->at(i) = vectorIndices[i];
-	}
+	mesh->numIndices = (USHORT) vectorIndices.size() / 3;
+	mesh->indexes = &faces;
 	
+	//Populate faces with vertices
+	for (int i = 0; i < mesh->numIndices; i = i++)
+	{
+		mesh->indexes->at(i).v1 = &vectorIndices[i];
+		mesh->indexes->at(i).v2 = &vectorIndices[i+1];
+		mesh->indexes->at(i).v3 = &vectorIndices[i+2];
+	}
+
 	//Close filestream, not sure if this was supposed to be left open?
 	fileStream.close();
 
