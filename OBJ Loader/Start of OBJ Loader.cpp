@@ -63,38 +63,13 @@ struct SimpleVertex
 	XMFLOAT2 Tex;
 };
 
-//struct Face
-//{
-//	USHORT *v1;
-//	USHORT *v2;
-//	USHORT *v3;
-//	USHORT *vt1;
-//	USHORT *vt2;
-//	USHORT *vt3;
-//	USHORT *vn1;
-//	USHORT *vn2;
-//	USHORT *vn3;
-//};
-
-struct VertexIndexes {
-	USHORT v, vt, vn;
-};
-
-struct Row {
-	VertexIndexes a, b, c;
-};
-
-struct TriangleMesh {
-	SimpleVertex v1, v2, v3;
-};
-
 //**************************************************************************//
 // A sort of mesh subset, basically an array of vertices and indexes.		//
 //**************************************************************************//
 struct SortOfMeshSubset
 {
-	std::vector <SimpleVertex> *vertices;
-	std::vector <USHORT>  *indexes;
+	SimpleVertex *vertices;
+	USHORT       *indexes;
 	USHORT       numVertices;
 	USHORT       numIndices;
 };
@@ -176,10 +151,6 @@ ID3D11Buffer                       *g_pCBChangeOnResize = NULL;
 ID3D11Buffer                       *g_pCBChangesEveryFrame = NULL;
 
 
-
-
-
-
 //**************************************************************************//
 // Forward declarations.													//
 //																			//
@@ -195,11 +166,6 @@ LRESULT CALLBACK    WndProc(HWND, UINT, WPARAM, LPARAM);
 void Render();
 void charStrToWideChar(WCHAR *dest, char *source);
 void XMFLOAT3normalise(XMFLOAT3 *toNormalise);
-bool XMFloat3Match(XMFLOAT3 f1, XMFLOAT3 f2);
-bool XMFloat2Match(XMFLOAT2 f1, XMFLOAT2 f2);
-bool SimpleVerticesMatch(SimpleVertex sv1, SimpleVertex sv2);
-bool TriangleMeshesMatch(TriangleMesh t1, TriangleMesh t2);
-void AddToVertices(SortOfMeshSubset *mesh, SimpleVertex vertex);
 SortOfMeshSubset *LoadMesh(LPSTR filename);
 void ParseMtlFile(WCHAR *mtlPath);
 
@@ -330,9 +296,6 @@ HRESULT CompileShaderFromFile(WCHAR* szFileName,		// File Name
 	return S_OK;
 }
 
-
-
-
 //--------------------------------------------------------------------------------------
 // Create Direct3D device and swap chain
 //--------------------------------------------------------------------------------------
@@ -442,11 +405,6 @@ HRESULT InitDevice()
 	vp.TopLeftY = 0;
 	g_pImmediateContext->RSSetViewports(1, &vp);
 
-
-
-
-
-
 	//**********************************************************************//
 	// Compile the shader file.  These files aren't pre-compiled (well, not //
 	// here, and are compiles on he fly).									//
@@ -523,7 +481,7 @@ HRESULT InitDevice()
 	//**************************************************************************//	
 	//SortOfMeshSubset *sortOfMesh = LoadMesh("Media\\Cup\\Cup.obj");
 	//SortOfMeshSubset *sortOfMesh = LoadMesh("Media\\Textured_triangulated_Cube\\cube.obj");
-	SortOfMeshSubset *sortOfMesh = LoadMesh("Media\\Textured_triangulated_Cube\\cube.obj");
+	SortOfMeshSubset *sortOfMesh = LoadMesh("Media\\pig\\pig.obj");
 
 	//**************************************************************************//
 	// Create the vertex buffer.												//
@@ -580,8 +538,8 @@ HRESULT InitDevice()
 	// Can this be true?  Nigel is caught cleaning up after himself.  Once the  //
 	// vertex and index buffers are created, this structure is no longer needed.//
 	//**************************************************************************//
-	sortOfMesh->indexes->clear();		// Delete the two arrays.
-	sortOfMesh->vertices->clear();
+	delete sortOfMesh->indexes;		// Delete the two arrays.
+	delete sortOfMesh->vertices;
 	delete sortOfMesh;				// Then delete  sortOfMesh
 
 
@@ -612,7 +570,7 @@ HRESULT InitDevice()
 	// Load the texture into "ordinary" RAM.									//
 	//**************************************************************************//
 	hr = D3DX11CreateShaderResourceViewFromFile(g_pd3dDevice,
-		L"Media\\Textured_triangulated_Cube\\cube.jpg",
+		L"Media\\pig\\pig_d.jpg",
 		NULL, NULL,
 		&g_pTextureResourceView,		// This is returned.
 		NULL);
@@ -780,7 +738,7 @@ void Render()
 	// The viewer matrix is created every frame here, which looks silly as the	//
 	// viewer never moves.  However in general your viewer does move.			//
 	//**************************************************************************//
-	XMVECTOR Eye = XMVectorSet(0.0f, 1.0f, -3.0f, 0.0f);
+	XMVECTOR Eye = XMVectorSet(-3.0f, 2.0f, -3.0f, 0.0f);
 	XMVECTOR At = XMVectorSet(0.0f, 0.0f, 0.0f, 0.0f);
 	XMVECTOR Up = XMVectorSet(0.0f, 1.0f, 0.0f, 0.0f);
 
@@ -887,32 +845,6 @@ struct VertexXYZ
 	float x, y, z;
 };
 
-bool XMFloat3Match(XMFLOAT3 f1, XMFLOAT3 f2)
-{
-	return (f1.x == f2.x && f1.y == f2.y && f1.z == f2.z);
-}
-
-bool XMFloat2Match(XMFLOAT2 f1, XMFLOAT2 f2)
-{
-	return (f1.x == f2.x && f1.y == f2.y);
-}
-
-bool SimpleVerticesMatch(SimpleVertex sv1, SimpleVertex sv2)
-{
-	return (XMFloat3Match(sv1.Pos, sv2.Pos) && XMFloat3Match(sv1.VecNormal, sv2.VecNormal) && XMFloat2Match(sv1.Tex, sv2.Tex));
-}
-
-bool TriangleMeshesMatch(TriangleMesh t1, TriangleMesh t2)
-{
-	return (SimpleVerticesMatch(t1.v1, t2.v1) && SimpleVerticesMatch(t1.v2, t2.v2) && SimpleVerticesMatch(t1.v3, t2.v3));
-}
-
-void AddToVertices(SortOfMeshSubset *mesh, SimpleVertex vertex)
-{
-	mesh->vertices->push_back(vertex);
-	mesh->indexes->push_back(mesh->vertices->size() -1);
-}
-
 //**************************************************************************//
 // Load the obj file into an array.  Everything here is wide (unicode)		//
 //strings, hence the "w"s on the front of everything.						//
@@ -932,12 +864,12 @@ SortOfMeshSubset *LoadMesh(LPSTR objFilePath)
 {
 	std::wifstream          fileStream;
 	std::wstring            line;
-	std::vector <TriangleMesh> testVector(0);
-	std::vector <Row> faces(0);
 	std::vector <VertexXYZ> vectorVertices(0);
 	std::vector <VertexXY> vectorTextureVertices(0);
 	std::vector <VertexXYZ> vectorNormal(0);
-	std::vector <USHORT>    vectorIndices(0);
+	std::vector <USHORT>    vertexIndices(0);
+	std::vector <USHORT>	normalIndices(0);
+	std::vector <USHORT>	textureIndices(0);
 
 	fileStream.open(objFilePath);
 	bool isOpen = fileStream.is_open();		//debugging only.
@@ -1087,52 +1019,15 @@ SortOfMeshSubset *LoadMesh(LPSTR objFilePath)
 				&v2, slash3, &vt2, slash4, &vn2,
 				&v3, slash5, &vt3, slash6, &vn3);
 
-			Row row;
-
-			SimpleVertex vert1, vert2, vert3;
-			vert1.Pos.x = vectorVertices[v1 - 1].x;
-			vert1.Pos.y = vectorVertices[v1 - 1].y;
-			vert1.Pos.z = vectorVertices[v1 - 1].z;
-			vert1.Tex.x = vectorTextureVertices[vt1 - 1].x;
-			vert1.Tex.y = vectorTextureVertices[vt1 - 1].y;
-			vert1.VecNormal.x = vectorNormal[vn1 - 1].x;
-			vert1.VecNormal.y = vectorNormal[vn1 - 1].y;
-			vert1.VecNormal.z = vectorNormal[vn1 - 1].z;
-
-			row.a.v = v1 - 1;
-			row.a.vt = vt1 - 1;
-			row.a.vn = vn1 - 1;
-
-			vert2.Pos.x = vectorVertices[v2 - 1].x;
-			vert2.Pos.y = vectorVertices[v2 - 1].y;
-			vert2.Pos.z = vectorVertices[v2 - 1].z;
-			vert2.Tex.x = vectorTextureVertices[vt2 - 1].x;
-			vert2.Tex.y = vectorTextureVertices[vt2 - 1].y;
-			vert2.VecNormal.x = vectorNormal[vn2 - 1].x;
-			vert2.VecNormal.y = vectorNormal[vn2 - 1].y;
-			vert2.VecNormal.z = vectorNormal[vn2 - 1].z;
-
-			row.b.v = v2 - 1;
-			row.b.vt = vt2 - 1;
-			row.b.vn = vn2 - 1;
-
-			vert3.Pos.x = vectorVertices[v3 - 1].x;
-			vert3.Pos.y = vectorVertices[v3 - 1].y;
-			vert3.Pos.z = vectorVertices[v3 - 1].z;
-			vert3.Tex.x = vectorTextureVertices[vt3 - 1].x;
-			vert3.Tex.y = vectorTextureVertices[vt3 - 1].y;
-			vert3.VecNormal.x = vectorNormal[vn3 - 1].x;
-			vert3.VecNormal.y = vectorNormal[vn3 - 1].y;
-			vert3.VecNormal.z = vectorNormal[vn3 - 1].z;
-
-			row.c.v = v3 - 1;
-			row.c.vt = vt3 - 1;
-			row.c.vn = vn3 - 1;
-
-			TriangleMesh face = { vert1, vert2, vert3 };
-
-			faces.push_back(row);
-			testVector.push_back(face);
+			vertexIndices.push_back(v1 - 1);	// Check this carefully; see below
+			vertexIndices.push_back(v2 - 1);
+			vertexIndices.push_back(v3 - 1);
+			normalIndices.push_back(vn1 - 1);
+			normalIndices.push_back(vn2 - 1);
+			normalIndices.push_back(vn3 - 1);
+			textureIndices.push_back(vt1 - 1);
+			textureIndices.push_back(vt2 - 1);
+			textureIndices.push_back(vt3 - 1);
 		}
 	}
 
@@ -1150,108 +1045,27 @@ SortOfMeshSubset *LoadMesh(LPSTR objFilePath)
 
 
 
-	int index = 0;
-	int testVectorSize = testVector.size();
-	std::vector <SimpleVertex> temp;
-	std::vector <USHORT> temp2;
-	mesh->vertices = &temp;
-	mesh->indexes = &temp2;
-
-	//Enter first vertex, adds to index
-	AddToVertices(mesh, testVector[0].v1);
-
-	bool v1Samev2 = SimpleVerticesMatch(testVector[0].v1, testVector[0].v2);
-	bool v1Samev3 = SimpleVerticesMatch(testVector[0].v1, testVector[0].v3);
-
-
-	if (v1Samev2)
+	mesh->numVertices = (USHORT)vectorVertices.size();
+	mesh->vertices = new SimpleVertex[mesh->numVertices];
+	for (int i = 0; i < mesh->numVertices; i++)
 	{
-		mesh->indexes->push_back(0);
-	}
-	else
-	{
-		AddToVertices(mesh, testVector[0].v2);
+		mesh->vertices[i].Pos.x = vectorVertices[i].x;
+		mesh->vertices[i].Pos.y = vectorVertices[i].y;
+		mesh->vertices[i].Pos.z = vectorVertices[i].z;
 	}
 
-	if (v1Samev3)
+	mesh->numIndices = (USHORT)vertexIndices.size();
+	mesh->indexes = new USHORT[mesh->numIndices];
+	for (int i = 0; i < mesh->numIndices; i++)
 	{
-		mesh->indexes->push_back(0);
-	}
-	else
-	{
-		AddToVertices(mesh, testVector[0].v3);
-	}
+		mesh->indexes[i] = vertexIndices[i];
 
-	for (int i = 0; i < testVectorSize; i++)
-	{
-		bool vertex1NotFound = true;
-		bool vertex2NotFound = true;
-		bool vertex3NotFound = true;
-		int v1FoundIndex;
-		int v2FoundIndex;
-		int v3FoundIndex;
-		//Compare to all other vertices
-		for (int j = 0; j < mesh->vertices->size(); j++)
-		{
-			if (SimpleVerticesMatch(mesh->vertices->at(j), testVector[i].v1))
-			{
-				vertex1NotFound = false;
-			}
-			else
-			{
-				v1FoundIndex = j;
-			}
-
-			if (SimpleVerticesMatch(mesh->vertices->at(j), testVector[i].v2))
-			{
-				vertex2NotFound = false;
-			}
-			else
-			{
-				v2FoundIndex = j;
-			}
-
-			if (SimpleVerticesMatch(mesh->vertices->at(j), testVector[i].v3))
-			{
-				vertex3NotFound = false;
-			}
-			else
-			{
-				v3FoundIndex = j;
-			}
-
-			if (!vertex1NotFound && !vertex2NotFound && !vertex3NotFound)
-			{
-				break;
-			}
-		}
-
-		if (vertex1NotFound)
-		{
-			AddToVertices(mesh, testVector[0].v1);
-		}
-		else
-		{
-			mesh->indexes->push_back(v1FoundIndex);
-		}
-
-		if (vertex2NotFound)
-		{
-			AddToVertices(mesh, testVector[0].v2);
-		}
-		else
-		{
-			mesh->indexes->push_back(v2FoundIndex);
-		}
-
-		if (vertex3NotFound)
-		{
-			AddToVertices(mesh, testVector[0].v3);
-		}
-		else
-		{
-			mesh->indexes->push_back(v3FoundIndex);
-		}
+		//Set normals and textures of indexed vertices according to their respective indices
+		mesh->vertices[mesh->indexes[i]].VecNormal.x = vectorNormal[normalIndices[i]].x;
+		mesh->vertices[mesh->indexes[i]].VecNormal.y = vectorNormal[normalIndices[i]].y;
+		mesh->vertices[mesh->indexes[i]].VecNormal.z = vectorNormal[normalIndices[i]].z;
+		mesh->vertices[mesh->indexes[i]].Tex.x = vectorTextureVertices[textureIndices[i]].x;
+		mesh->vertices[mesh->indexes[i]].Tex.y = vectorTextureVertices[textureIndices[i]].y;
 	}
 
 	//Close filestream, not sure if this was supposed to be left open?
