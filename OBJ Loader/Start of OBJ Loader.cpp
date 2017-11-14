@@ -58,24 +58,35 @@
 //**************************************************************************//
 struct SimpleVertex
 {
-    XMFLOAT3 Pos;	//Why not a float4?  See the shader strucrure.  Any thoughts?  Nigel
+	XMFLOAT3 Pos;	//Why not a float4?  See the shader strucrure.  Any thoughts?  Nigel
 	XMFLOAT3 VecNormal;
-    XMFLOAT2 Tex;
+	XMFLOAT2 Tex;
 };
 
-struct Face
-{
-	USHORT *v1;
-	USHORT *v2;
-	USHORT *v3;
-	USHORT *vt1;
-	USHORT *vt2;
-	USHORT *vt3;
-	USHORT *vn1;
-	USHORT *vn2;
-	USHORT *vn3;
+//struct Face
+//{
+//	USHORT *v1;
+//	USHORT *v2;
+//	USHORT *v3;
+//	USHORT *vt1;
+//	USHORT *vt2;
+//	USHORT *vt3;
+//	USHORT *vn1;
+//	USHORT *vn2;
+//	USHORT *vn3;
+//};
+
+struct VertexIndexes {
+	USHORT v, vt, vn;
 };
 
+struct Row {
+	VertexIndexes a, b, c;
+};
+
+struct TriangleMesh {
+	SimpleVertex v1, v2, v3;
+};
 
 //**************************************************************************//
 // A sort of mesh subset, basically an array of vertices and indexes.		//
@@ -83,7 +94,7 @@ struct Face
 struct SortOfMeshSubset
 {
 	std::vector <SimpleVertex> *vertices;
-	std::vector <Face>  *indexes;
+	std::vector <USHORT>  *indexes;
 	USHORT       numVertices;
 	USHORT       numIndices;
 };
@@ -104,13 +115,13 @@ struct CBMeshMaterial
 //**************************************************************************//
 struct CBNeverChanges
 {
-    XMFLOAT4 materialColour;
+	XMFLOAT4 materialColour;
 	XMVECTOR vecLight;			// Must be 4, we only use the first 3.
 };
 
 struct CBChangeOnResize
 {
-    XMMATRIX matProjection;
+	XMMATRIX matProjection;
 };
 
 //**************************************************************************//
@@ -121,7 +132,7 @@ struct CBChangeOnResize
 //**************************************************************************//
 struct CBChangesEveryFrame
 {
-    XMMATRIX matWorld;
+	XMMATRIX matWorld;
 	XMMATRIX matWorldViewProjection;
 };
 
@@ -154,14 +165,14 @@ XMMATRIX                            g_MatProjection;
 //**************************************************************************//
 // The texture; just one here.												//
 //**************************************************************************//
-ID3D11ShaderResourceView           *g_pTextureResourceView   = NULL;
+ID3D11ShaderResourceView           *g_pTextureResourceView = NULL;
 
 
 //**************************************************************************//
 // Now a global instance of each constant buffer.							//
 //**************************************************************************//
-ID3D11Buffer                       *g_pCBNeverChanges      = NULL;
-ID3D11Buffer                       *g_pCBChangeOnResize    = NULL;
+ID3D11Buffer                       *g_pCBNeverChanges = NULL;
+ID3D11Buffer                       *g_pCBChangeOnResize = NULL;
 ID3D11Buffer                       *g_pCBChangesEveryFrame = NULL;
 
 
@@ -177,13 +188,18 @@ ID3D11Buffer                       *g_pCBChangesEveryFrame = NULL;
 // prototypes in a header file, but we'll put them here for now to keep		//
 // things simple.															//
 //**************************************************************************//
-HRESULT InitWindow( HINSTANCE hInstance, int nCmdShow );
+HRESULT InitWindow(HINSTANCE hInstance, int nCmdShow);
 HRESULT InitDevice();
 void CleanupDevice();
-LRESULT CALLBACK    WndProc( HWND, UINT, WPARAM, LPARAM );
+LRESULT CALLBACK    WndProc(HWND, UINT, WPARAM, LPARAM);
 void Render();
 void charStrToWideChar(WCHAR *dest, char *source);
 void XMFLOAT3normalise(XMFLOAT3 *toNormalise);
+bool XMFloat3Match(XMFLOAT3 f1, XMFLOAT3 f2);
+bool XMFloat2Match(XMFLOAT2 f1, XMFLOAT2 f2);
+bool SimpleVerticesMatch(SimpleVertex sv1, SimpleVertex sv2);
+bool TriangleMeshesMatch(TriangleMesh t1, TriangleMesh t2);
+void AddToVertices(SortOfMeshSubset *mesh, SimpleVertex vertex);
 SortOfMeshSubset *LoadMesh(LPSTR filename);
 void ParseMtlFile(WCHAR *mtlPath);
 
@@ -197,83 +213,83 @@ void ParseMtlFile(WCHAR *mtlPath);
 //																			//
 // In other words, run the computer flat out.  Is this good?				//
 //**************************************************************************//
-int WINAPI wWinMain( HINSTANCE hInstance, HINSTANCE hPrevInstance, LPWSTR lpCmdLine, int nCmdShow )
+int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPWSTR lpCmdLine, int nCmdShow)
 {
-    UNREFERENCED_PARAMETER( hPrevInstance );
-    UNREFERENCED_PARAMETER( lpCmdLine );
+	UNREFERENCED_PARAMETER(hPrevInstance);
+	UNREFERENCED_PARAMETER(lpCmdLine);
 
-    if( FAILED( InitWindow( hInstance, nCmdShow ) ) )
-        return 0;
+	if (FAILED(InitWindow(hInstance, nCmdShow)))
+		return 0;
 
-    if( FAILED( InitDevice() ) )
-    {
-        CleanupDevice();
-        return 0;
-    }
+	if (FAILED(InitDevice()))
+	{
+		CleanupDevice();
+		return 0;
+	}
 
 
 
 	//**************************************************************************//
-    // Main Windoze message loop.												//
+	// Main Windoze message loop.												//
 	//																			//
 	// Gamers will see this as a game loop, though you will find something like //
 	// this main loop deep within any Windows application.						//
 	//**************************************************************************//
-    MSG msg = {0};
-    while( WM_QUIT != msg.message )
-    {
-        if( PeekMessage( &msg, NULL, 0, 0, PM_REMOVE ) )
-        {
-            TranslateMessage( &msg );
-            DispatchMessage( &msg );
-        }
-        else
-        {
-            Render();
-        }
-    }
+	MSG msg = { 0 };
+	while (WM_QUIT != msg.message)
+	{
+		if (PeekMessage(&msg, NULL, 0, 0, PM_REMOVE))
+		{
+			TranslateMessage(&msg);
+			DispatchMessage(&msg);
+		}
+		else
+		{
+			Render();
+		}
+	}
 
-    CleanupDevice();
+	CleanupDevice();
 
-    return ( int )msg.wParam;
+	return (int)msg.wParam;
 }
 
 
 //--------------------------------------------------------------------------------------
 // Register class and create window
 //--------------------------------------------------------------------------------------
-HRESULT InitWindow( HINSTANCE hInstance, int nCmdShow )
+HRESULT InitWindow(HINSTANCE hInstance, int nCmdShow)
 {
-    // Register class
-    WNDCLASSEX wcex;
-    wcex.cbSize = sizeof( WNDCLASSEX );
-    wcex.style = CS_HREDRAW | CS_VREDRAW;
-    wcex.lpfnWndProc = WndProc;
-    wcex.cbClsExtra = 0;
-    wcex.cbWndExtra = 0;
-    wcex.hInstance = hInstance;
-    wcex.hIcon = LoadIcon( hInstance, ( LPCTSTR )IDI_TUTORIAL1 );
-    wcex.hCursor = LoadCursor( NULL, IDC_ARROW );
-    wcex.hbrBackground = ( HBRUSH )( COLOR_WINDOW + 1 );
-    wcex.lpszMenuName = NULL;
-    wcex.lpszClassName = L"TutorialWindowClass";
-    wcex.hIconSm = LoadIcon( wcex.hInstance, ( LPCTSTR )IDI_TUTORIAL1 );
-    if( !RegisterClassEx( &wcex ) )
-        return E_FAIL;
+	// Register class
+	WNDCLASSEX wcex;
+	wcex.cbSize = sizeof(WNDCLASSEX);
+	wcex.style = CS_HREDRAW | CS_VREDRAW;
+	wcex.lpfnWndProc = WndProc;
+	wcex.cbClsExtra = 0;
+	wcex.cbWndExtra = 0;
+	wcex.hInstance = hInstance;
+	wcex.hIcon = LoadIcon(hInstance, (LPCTSTR)IDI_TUTORIAL1);
+	wcex.hCursor = LoadCursor(NULL, IDC_ARROW);
+	wcex.hbrBackground = (HBRUSH)(COLOR_WINDOW + 1);
+	wcex.lpszMenuName = NULL;
+	wcex.lpszClassName = L"TutorialWindowClass";
+	wcex.hIconSm = LoadIcon(wcex.hInstance, (LPCTSTR)IDI_TUTORIAL1);
+	if (!RegisterClassEx(&wcex))
+		return E_FAIL;
 
-    // Create window
-    g_hInst = hInstance;
-    RECT rc = { 0, 0, 640, 480 };
-    AdjustWindowRect( &rc, WS_OVERLAPPEDWINDOW, FALSE );
-    g_hWnd = CreateWindow( L"TutorialWindowClass", L"Direct3D 11 Tutorial 7", WS_OVERLAPPEDWINDOW,
-                           CW_USEDEFAULT, CW_USEDEFAULT, rc.right - rc.left, rc.bottom - rc.top, NULL, NULL, hInstance,
-                           NULL );
-    if( !g_hWnd )
-        return E_FAIL;
+	// Create window
+	g_hInst = hInstance;
+	RECT rc = { 0, 0, 640, 480 };
+	AdjustWindowRect(&rc, WS_OVERLAPPEDWINDOW, FALSE);
+	g_hWnd = CreateWindow(L"TutorialWindowClass", L"Direct3D 11 Tutorial 7", WS_OVERLAPPEDWINDOW,
+		CW_USEDEFAULT, CW_USEDEFAULT, rc.right - rc.left, rc.bottom - rc.top, NULL, NULL, hInstance,
+		NULL);
+	if (!g_hWnd)
+		return E_FAIL;
 
-    ShowWindow( g_hWnd, nCmdShow );
+	ShowWindow(g_hWnd, nCmdShow);
 
-    return S_OK;
+	return S_OK;
 }
 
 
@@ -281,37 +297,37 @@ HRESULT InitWindow( HINSTANCE hInstance, int nCmdShow )
 // Compile the shader file.  These files aren't pre-compiled (well, not		//
 // here, and are compiled on he fly).										//
 //**************************************************************************//
-HRESULT CompileShaderFromFile( WCHAR* szFileName,		// File Name
-							  LPCSTR szEntryPoint,		// Namee of shader
-							  LPCSTR szShaderModel,		// Shader model
-							  ID3DBlob** ppBlobOut )	// Blob returned
+HRESULT CompileShaderFromFile(WCHAR* szFileName,		// File Name
+	LPCSTR szEntryPoint,		// Namee of shader
+	LPCSTR szShaderModel,		// Shader model
+	ID3DBlob** ppBlobOut)	// Blob returned
 {
-    HRESULT hr = S_OK;
+	HRESULT hr = S_OK;
 
-    DWORD dwShaderFlags = D3DCOMPILE_ENABLE_STRICTNESS;
+	DWORD dwShaderFlags = D3DCOMPILE_ENABLE_STRICTNESS;
 #if defined( DEBUG ) || defined( _DEBUG )
-    // Set the D3DCOMPILE_DEBUG flag to embed debug information in the shaders.
-    // Setting this flag improves the shader debugging experience, but still allows 
-    // the shaders to be optimized and to run exactly the way they will run in 
-    // the release configuration of this program.
-    dwShaderFlags |= D3DCOMPILE_DEBUG;
+	// Set the D3DCOMPILE_DEBUG flag to embed debug information in the shaders.
+	// Setting this flag improves the shader debugging experience, but still allows 
+	// the shaders to be optimized and to run exactly the way they will run in 
+	// the release configuration of this program.
+	dwShaderFlags |= D3DCOMPILE_DEBUG;
 #endif
 
-    ID3DBlob* pErrorBlob;
-    hr = D3DX11CompileFromFile( szFileName, NULL, NULL, szEntryPoint, szShaderModel, 
-        dwShaderFlags, 0, NULL, ppBlobOut, &pErrorBlob, NULL );
-   if( FAILED(hr) )
-    {
+	ID3DBlob* pErrorBlob;
+	hr = D3DX11CompileFromFile(szFileName, NULL, NULL, szEntryPoint, szShaderModel,
+		dwShaderFlags, 0, NULL, ppBlobOut, &pErrorBlob, NULL);
+	if (FAILED(hr))
+	{
 		WCHAR errorCharsW[200];
-        if( pErrorBlob != NULL )
+		if (pErrorBlob != NULL)
 		{
 			charStrToWideChar(errorCharsW, (char *)pErrorBlob->GetBufferPointer());
-            MessageBox( 0, errorCharsW, L"Error", 0 );
+			MessageBox(0, errorCharsW, L"Error", 0);
 		}
-    }
-    if( pErrorBlob ) pErrorBlob->Release();
+	}
+	if (pErrorBlob) pErrorBlob->Release();
 
-    return S_OK;
+	return S_OK;
 }
 
 
@@ -322,115 +338,115 @@ HRESULT CompileShaderFromFile( WCHAR* szFileName,		// File Name
 //--------------------------------------------------------------------------------------
 HRESULT InitDevice()
 {
-    HRESULT hr = S_OK;
+	HRESULT hr = S_OK;
 
-    RECT rc;
-    GetClientRect( g_hWnd, &rc );
-    UINT width = rc.right - rc.left;
-    UINT height = rc.bottom - rc.top;
+	RECT rc;
+	GetClientRect(g_hWnd, &rc);
+	UINT width = rc.right - rc.left;
+	UINT height = rc.bottom - rc.top;
 
-    UINT createDeviceFlags = 0;
+	UINT createDeviceFlags = 0;
 #ifdef _DEBUG
-    createDeviceFlags |= D3D11_CREATE_DEVICE_DEBUG;
+	createDeviceFlags |= D3D11_CREATE_DEVICE_DEBUG;
 #endif
 
-    D3D_DRIVER_TYPE driverTypes[] =
-    {
-        D3D_DRIVER_TYPE_HARDWARE,
-        D3D_DRIVER_TYPE_WARP,
-        D3D_DRIVER_TYPE_REFERENCE,
-    };
-    UINT numDriverTypes = ARRAYSIZE( driverTypes );
+	D3D_DRIVER_TYPE driverTypes[] =
+	{
+		D3D_DRIVER_TYPE_HARDWARE,
+		D3D_DRIVER_TYPE_WARP,
+		D3D_DRIVER_TYPE_REFERENCE,
+	};
+	UINT numDriverTypes = ARRAYSIZE(driverTypes);
 
-    D3D_FEATURE_LEVEL featureLevels[] =
-    {
-        D3D_FEATURE_LEVEL_11_0,
-        D3D_FEATURE_LEVEL_10_1,
-        D3D_FEATURE_LEVEL_10_0,
-    };
-    UINT numFeatureLevels = ARRAYSIZE( featureLevels );
+	D3D_FEATURE_LEVEL featureLevels[] =
+	{
+		D3D_FEATURE_LEVEL_11_0,
+		D3D_FEATURE_LEVEL_10_1,
+		D3D_FEATURE_LEVEL_10_0,
+	};
+	UINT numFeatureLevels = ARRAYSIZE(featureLevels);
 
-    DXGI_SWAP_CHAIN_DESC sd;
-    ZeroMemory( &sd, sizeof( sd ) );
-    sd.BufferCount = 1;
-    sd.BufferDesc.Width = width;
-    sd.BufferDesc.Height = height;
-    sd.BufferDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
-    sd.BufferDesc.RefreshRate.Numerator = 60;
-    sd.BufferDesc.RefreshRate.Denominator = 1;
-    sd.BufferUsage = DXGI_USAGE_RENDER_TARGET_OUTPUT;
-    sd.OutputWindow = g_hWnd;
-    sd.SampleDesc.Count = 1;
-    sd.SampleDesc.Quality = 0;
-    sd.Windowed = TRUE;
+	DXGI_SWAP_CHAIN_DESC sd;
+	ZeroMemory(&sd, sizeof(sd));
+	sd.BufferCount = 1;
+	sd.BufferDesc.Width = width;
+	sd.BufferDesc.Height = height;
+	sd.BufferDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
+	sd.BufferDesc.RefreshRate.Numerator = 60;
+	sd.BufferDesc.RefreshRate.Denominator = 1;
+	sd.BufferUsage = DXGI_USAGE_RENDER_TARGET_OUTPUT;
+	sd.OutputWindow = g_hWnd;
+	sd.SampleDesc.Count = 1;
+	sd.SampleDesc.Quality = 0;
+	sd.Windowed = TRUE;
 
-    for( UINT driverTypeIndex = 0; driverTypeIndex < numDriverTypes; driverTypeIndex++ )
-    {
-        g_driverType = driverTypes[driverTypeIndex];
-        hr = D3D11CreateDeviceAndSwapChain( NULL, g_driverType, NULL, createDeviceFlags, featureLevels, numFeatureLevels,
-                                            D3D11_SDK_VERSION, &sd, &g_pSwapChain, &g_pd3dDevice, &g_featureLevel, &g_pImmediateContext );
-        if( SUCCEEDED( hr ) )
-            break;
-    }
-    if( FAILED( hr ) )
-        return hr;
+	for (UINT driverTypeIndex = 0; driverTypeIndex < numDriverTypes; driverTypeIndex++)
+	{
+		g_driverType = driverTypes[driverTypeIndex];
+		hr = D3D11CreateDeviceAndSwapChain(NULL, g_driverType, NULL, createDeviceFlags, featureLevels, numFeatureLevels,
+			D3D11_SDK_VERSION, &sd, &g_pSwapChain, &g_pd3dDevice, &g_featureLevel, &g_pImmediateContext);
+		if (SUCCEEDED(hr))
+			break;
+	}
+	if (FAILED(hr))
+		return hr;
 
-    // Create a render target view
-    ID3D11Texture2D* pBackBuffer = NULL;
-    hr = g_pSwapChain->GetBuffer( 0, __uuidof( ID3D11Texture2D ), ( LPVOID* )&pBackBuffer );
-    if( FAILED( hr ) )
-        return hr;
+	// Create a render target view
+	ID3D11Texture2D* pBackBuffer = NULL;
+	hr = g_pSwapChain->GetBuffer(0, __uuidof(ID3D11Texture2D), (LPVOID*)&pBackBuffer);
+	if (FAILED(hr))
+		return hr;
 
-    hr = g_pd3dDevice->CreateRenderTargetView( pBackBuffer, NULL, &g_pRenderTargetView );
-    pBackBuffer->Release();
-    if( FAILED( hr ) )
-        return hr;
+	hr = g_pd3dDevice->CreateRenderTargetView(pBackBuffer, NULL, &g_pRenderTargetView);
+	pBackBuffer->Release();
+	if (FAILED(hr))
+		return hr;
 
-    // Create depth stencil texture
-    D3D11_TEXTURE2D_DESC descDepth;
-    ZeroMemory( &descDepth, sizeof(descDepth) );
-    descDepth.Width = width;
-    descDepth.Height = height;
-    descDepth.MipLevels = 1;
-    descDepth.ArraySize = 1;
-    descDepth.Format = DXGI_FORMAT_D24_UNORM_S8_UINT;
-    descDepth.SampleDesc.Count = 1;
-    descDepth.SampleDesc.Quality = 0;
-    descDepth.Usage = D3D11_USAGE_DEFAULT;
-    descDepth.BindFlags = D3D11_BIND_DEPTH_STENCIL;
-    descDepth.CPUAccessFlags = 0;
-    descDepth.MiscFlags = 0;
-    hr = g_pd3dDevice->CreateTexture2D( &descDepth, NULL, &g_pDepthStencil );
-    if( FAILED( hr ) )
-        return hr;
+	// Create depth stencil texture
+	D3D11_TEXTURE2D_DESC descDepth;
+	ZeroMemory(&descDepth, sizeof(descDepth));
+	descDepth.Width = width;
+	descDepth.Height = height;
+	descDepth.MipLevels = 1;
+	descDepth.ArraySize = 1;
+	descDepth.Format = DXGI_FORMAT_D24_UNORM_S8_UINT;
+	descDepth.SampleDesc.Count = 1;
+	descDepth.SampleDesc.Quality = 0;
+	descDepth.Usage = D3D11_USAGE_DEFAULT;
+	descDepth.BindFlags = D3D11_BIND_DEPTH_STENCIL;
+	descDepth.CPUAccessFlags = 0;
+	descDepth.MiscFlags = 0;
+	hr = g_pd3dDevice->CreateTexture2D(&descDepth, NULL, &g_pDepthStencil);
+	if (FAILED(hr))
+		return hr;
 
-    // Create the depth stencil view
-    D3D11_DEPTH_STENCIL_VIEW_DESC descDSV;
-    ZeroMemory( &descDSV, sizeof(descDSV) );
-    descDSV.Format = descDepth.Format;
-    descDSV.ViewDimension = D3D11_DSV_DIMENSION_TEXTURE2D;
-    descDSV.Texture2D.MipSlice = 0;
-    hr = g_pd3dDevice->CreateDepthStencilView( g_pDepthStencil, &descDSV, &g_pDepthStencilView );
-    if( FAILED( hr ) )
-        return hr;
+	// Create the depth stencil view
+	D3D11_DEPTH_STENCIL_VIEW_DESC descDSV;
+	ZeroMemory(&descDSV, sizeof(descDSV));
+	descDSV.Format = descDepth.Format;
+	descDSV.ViewDimension = D3D11_DSV_DIMENSION_TEXTURE2D;
+	descDSV.Texture2D.MipSlice = 0;
+	hr = g_pd3dDevice->CreateDepthStencilView(g_pDepthStencil, &descDSV, &g_pDepthStencilView);
+	if (FAILED(hr))
+		return hr;
 
-    g_pImmediateContext->OMSetRenderTargets( 1, &g_pRenderTargetView, g_pDepthStencilView );
+	g_pImmediateContext->OMSetRenderTargets(1, &g_pRenderTargetView, g_pDepthStencilView);
 
-    // Setup the viewport
-    D3D11_VIEWPORT vp;
-    vp.Width = (FLOAT)width;
-    vp.Height = (FLOAT)height;
-    vp.MinDepth = 0.0f;
-    vp.MaxDepth = 1.0f;
-    vp.TopLeftX = 0;
-    vp.TopLeftY = 0;
-    g_pImmediateContext->RSSetViewports( 1, &vp );
+	// Setup the viewport
+	D3D11_VIEWPORT vp;
+	vp.Width = (FLOAT)width;
+	vp.Height = (FLOAT)height;
+	vp.MinDepth = 0.0f;
+	vp.MaxDepth = 1.0f;
+	vp.TopLeftX = 0;
+	vp.TopLeftY = 0;
+	g_pImmediateContext->RSSetViewports(1, &vp);
 
-    
- 	
 
-	
-	
+
+
+
+
 	//**********************************************************************//
 	// Compile the shader file.  These files aren't pre-compiled (well, not //
 	// here, and are compiles on he fly).									//
@@ -438,44 +454,44 @@ HRESULT InitDevice()
 	// This is DirectX11, but what shader model do you see here?			//
 	// Change to shader model 5 in Babbage209 and it should still work.		//
 	//**********************************************************************//
-    ID3DBlob* pVSBlob = NULL;
-    hr = CompileShaderFromFile( L"Start of OBJ loader VS.hlsl", "VS_obj", "vs_4_0", &pVSBlob );
-    if( FAILED( hr ) )
-    {
-        MessageBox( NULL,
-                    L"The FX file cannot be compiled.  Please run this executable from the directory that contains the FX file.", L"Error", MB_OK );
-        return hr;
-    }
+	ID3DBlob* pVSBlob = NULL;
+	hr = CompileShaderFromFile(L"Start of OBJ loader VS.hlsl", "VS_obj", "vs_4_0", &pVSBlob);
+	if (FAILED(hr))
+	{
+		MessageBox(NULL,
+			L"The FX file cannot be compiled.  Please run this executable from the directory that contains the FX file.", L"Error", MB_OK);
+		return hr;
+	}
 
 	//**********************************************************************//
-    // Create the vertex shader.											//
+	// Create the vertex shader.											//
 	//**********************************************************************//
-	hr = g_pd3dDevice->CreateVertexShader( pVSBlob->GetBufferPointer(), pVSBlob->GetBufferSize(), NULL, &g_pVertexShader );
-    if( FAILED( hr ) )
-    {    
-        pVSBlob->Release();
-        return hr;
-    }
+	hr = g_pd3dDevice->CreateVertexShader(pVSBlob->GetBufferPointer(), pVSBlob->GetBufferSize(), NULL, &g_pVertexShader);
+	if (FAILED(hr))
+	{
+		pVSBlob->Release();
+		return hr;
+	}
 
 	//**********************************************************************//
-    // Create the pixel shader.												//
-    //**********************************************************************//
+	// Create the pixel shader.												//
+	//**********************************************************************//
 	ID3DBlob* pPSBlob = NULL;
-    hr = CompileShaderFromFile( L"Start of OBJ loader PS.hlsl", "PS_TexturesNoLighting", "ps_4_0", &pPSBlob );
-    if( FAILED( hr ) )
-    {
-        MessageBox( NULL,
-                    L"The FX file cannot be compiled.  Please run this executable from the directory that contains the FX file.", L"Error", MB_OK );
-        return hr;
-    }
-    hr = g_pd3dDevice->CreatePixelShader( pPSBlob->GetBufferPointer(), pPSBlob->GetBufferSize(), NULL, &g_pPixelShader );
-    pPSBlob->Release();
-    if( FAILED( hr ) )
-        return hr;
+	hr = CompileShaderFromFile(L"Start of OBJ loader PS.hlsl", "PS_TexturesNoLighting", "ps_4_0", &pPSBlob);
+	if (FAILED(hr))
+	{
+		MessageBox(NULL,
+			L"The FX file cannot be compiled.  Please run this executable from the directory that contains the FX file.", L"Error", MB_OK);
+		return hr;
+	}
+	hr = g_pd3dDevice->CreatePixelShader(pPSBlob->GetBufferPointer(), pPSBlob->GetBufferSize(), NULL, &g_pPixelShader);
+	pPSBlob->Release();
+	if (FAILED(hr))
+		return hr;
 
 
 	//**********************************************************************//
-    // Define the input layout.  I won't go too much into this except that  //
+	// Define the input layout.  I won't go too much into this except that  //
 	// the vertex defined here MUST be consistent with the vertex shader	//
 	// input you use in your shader file and the constand buffer structure  //
 	// at the top of this module.											//
@@ -483,25 +499,25 @@ HRESULT InitDevice()
 	// Here a vertex has a position a normal vector (used for lighting) and //
 	// a single texture UV coordinate.										//
 	//**********************************************************************//
-    D3D11_INPUT_ELEMENT_DESC layout[] =
-    {
-        { "POSITION",  0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 0,  D3D11_INPUT_PER_VERTEX_DATA, 0 },
-        { "NORMAL",    0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 12, D3D11_INPUT_PER_VERTEX_DATA, 0 },
-        { "TEXCOORD",  0, DXGI_FORMAT_R32G32_FLOAT,    0, 24, D3D11_INPUT_PER_VERTEX_DATA, 0 },
+	D3D11_INPUT_ELEMENT_DESC layout[] =
+	{
+		{ "POSITION",  0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 0,  D3D11_INPUT_PER_VERTEX_DATA, 0 },
+		{ "NORMAL",    0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 12, D3D11_INPUT_PER_VERTEX_DATA, 0 },
+		{ "TEXCOORD",  0, DXGI_FORMAT_R32G32_FLOAT,    0, 24, D3D11_INPUT_PER_VERTEX_DATA, 0 },
 	};
-    UINT numElements = ARRAYSIZE( layout );
+	UINT numElements = ARRAYSIZE(layout);
 
-    // Create the input layout
-    hr = g_pd3dDevice->CreateInputLayout( layout, numElements, pVSBlob->GetBufferPointer(),
-                                          pVSBlob->GetBufferSize(), &g_pVertexLayout );
-    pVSBlob->Release();
-    if( FAILED( hr ) )
-        return hr;
+	// Create the input layout
+	hr = g_pd3dDevice->CreateInputLayout(layout, numElements, pVSBlob->GetBufferPointer(),
+		pVSBlob->GetBufferSize(), &g_pVertexLayout);
+	pVSBlob->Release();
+	if (FAILED(hr))
+		return hr;
 
-    // Set the input layout
-    g_pImmediateContext->IASetInputLayout( g_pVertexLayout );
+	// Set the input layout
+	g_pImmediateContext->IASetInputLayout(g_pVertexLayout);
 
-	
+
 	//**************************************************************************//
 	// Load the obj mesh, NOT COMPLETE.											//
 	//**************************************************************************//	
@@ -512,52 +528,52 @@ HRESULT InitDevice()
 	//**************************************************************************//
 	// Create the vertex buffer.												//
 	//**************************************************************************//
-    D3D11_BUFFER_DESC bd;
-    ZeroMemory( &bd, sizeof(bd) );
-    bd.Usage = D3D11_USAGE_DEFAULT;
-	bd.ByteWidth = sizeof( SimpleVertex ) * sortOfMesh->numVertices;	//From sortOfMesh
-    bd.BindFlags = D3D11_BIND_VERTEX_BUFFER;
-    bd.CPUAccessFlags = 0;
-    D3D11_SUBRESOURCE_DATA InitData;
-    ZeroMemory( &InitData, sizeof(InitData) );
+	D3D11_BUFFER_DESC bd;
+	ZeroMemory(&bd, sizeof(bd));
+	bd.Usage = D3D11_USAGE_DEFAULT;
+	bd.ByteWidth = sizeof(SimpleVertex) * sortOfMesh->numVertices;	//From sortOfMesh
+	bd.BindFlags = D3D11_BIND_VERTEX_BUFFER;
+	bd.CPUAccessFlags = 0;
+	D3D11_SUBRESOURCE_DATA InitData;
+	ZeroMemory(&InitData, sizeof(InitData));
 	InitData.pSysMem = sortOfMesh->vertices;						//From sortOfMesh
 
-    hr = g_pd3dDevice->CreateBuffer( &bd, &InitData, &g_pVertexBuffer );
-    if( FAILED( hr ) )
-        return hr;
+	hr = g_pd3dDevice->CreateBuffer(&bd, &InitData, &g_pVertexBuffer);
+	if (FAILED(hr))
+		return hr;
 
-    // Set vertex buffer
-    UINT stride = sizeof( SimpleVertex );
-    UINT offset = 0;
-    g_pImmediateContext->IASetVertexBuffers( 0, 1, &g_pVertexBuffer, &stride, &offset );
+	// Set vertex buffer
+	UINT stride = sizeof(SimpleVertex);
+	UINT offset = 0;
+	g_pImmediateContext->IASetVertexBuffers(0, 1, &g_pVertexBuffer, &stride, &offset);
 
 
 
- 	//**************************************************************************//
+	//**************************************************************************//
 	// Now define some triangles.  That's all DirectX allows us to draw.  This  //
 	// is called an index buffer, and it indexes the vertices to make triangles.//
 	//																			//
 	// This is called an index buffer.											//
 	//**************************************************************************//
 
-    bd.Usage = D3D11_USAGE_DEFAULT;
-	bd.ByteWidth = sizeof( USHORT ) * sortOfMesh->numIndices;   //From sortOfMesh
-	
+	bd.Usage = D3D11_USAGE_DEFAULT;
+	bd.ByteWidth = sizeof(USHORT) * sortOfMesh->numIndices;   //From sortOfMesh
+
 	bd.BindFlags = D3D11_BIND_INDEX_BUFFER;
-    bd.CPUAccessFlags = 0;
+	bd.CPUAccessFlags = 0;
 	InitData.pSysMem = sortOfMesh->indexes;					//From sortOfMesh
 
-    hr = g_pd3dDevice->CreateBuffer( &bd, &InitData, &g_pIndexBuffer );
-    if( FAILED( hr ) )
-        return hr;
+	hr = g_pd3dDevice->CreateBuffer(&bd, &InitData, &g_pIndexBuffer);
+	if (FAILED(hr))
+		return hr;
 
 	g_numIndices = sortOfMesh->numIndices;
 
-    // Set index buffer
-    g_pImmediateContext->IASetIndexBuffer( g_pIndexBuffer, DXGI_FORMAT_R16_UINT, 0 );
+	// Set index buffer
+	g_pImmediateContext->IASetIndexBuffer(g_pIndexBuffer, DXGI_FORMAT_R16_UINT, 0);
 
-    // Set primitive topology
-    g_pImmediateContext->IASetPrimitiveTopology( D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST );
+	// Set primitive topology
+	g_pImmediateContext->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 
 
 	//**************************************************************************//
@@ -569,39 +585,39 @@ HRESULT InitDevice()
 	delete sortOfMesh;				// Then delete  sortOfMesh
 
 
- 	//**************************************************************************//
+	//**************************************************************************//
 	// Create the 3 constant buffers.											//
 	//**************************************************************************//
-    bd.Usage = D3D11_USAGE_DEFAULT;
-    bd.ByteWidth = sizeof(CBNeverChanges);
-    bd.BindFlags = D3D11_BIND_CONSTANT_BUFFER;
-    bd.CPUAccessFlags = 0;
-    hr = g_pd3dDevice->CreateBuffer( &bd, NULL, &g_pCBNeverChanges );
-    if( FAILED( hr ) )
-        return hr;
-    
-    bd.ByteWidth = sizeof(CBChangeOnResize);
-    hr = g_pd3dDevice->CreateBuffer( &bd, NULL, &g_pCBChangeOnResize );
-    if( FAILED( hr ) )
-        return hr;
-    
-    bd.ByteWidth = sizeof(CBChangesEveryFrame);
-    hr = g_pd3dDevice->CreateBuffer( &bd, NULL, &g_pCBChangesEveryFrame );
-    if( FAILED( hr ) )
-        return hr;
+	bd.Usage = D3D11_USAGE_DEFAULT;
+	bd.ByteWidth = sizeof(CBNeverChanges);
+	bd.BindFlags = D3D11_BIND_CONSTANT_BUFFER;
+	bd.CPUAccessFlags = 0;
+	hr = g_pd3dDevice->CreateBuffer(&bd, NULL, &g_pCBNeverChanges);
+	if (FAILED(hr))
+		return hr;
+
+	bd.ByteWidth = sizeof(CBChangeOnResize);
+	hr = g_pd3dDevice->CreateBuffer(&bd, NULL, &g_pCBChangeOnResize);
+	if (FAILED(hr))
+		return hr;
+
+	bd.ByteWidth = sizeof(CBChangesEveryFrame);
+	hr = g_pd3dDevice->CreateBuffer(&bd, NULL, &g_pCBChangesEveryFrame);
+	if (FAILED(hr))
+		return hr;
 
 
 
-   	//**************************************************************************//
+	//**************************************************************************//
 	// Load the texture into "ordinary" RAM.									//
 	//**************************************************************************//
-	hr = D3DX11CreateShaderResourceViewFromFile( g_pd3dDevice, 
-												 L"Media\\Textured_triangulated_Cube\\cube.jpg", 
-												 NULL, NULL, 
-												 &g_pTextureResourceView,		// This is returned.
-												 NULL );
-    if( FAILED( hr ) )
-        return hr;
+	hr = D3DX11CreateShaderResourceViewFromFile(g_pd3dDevice,
+		L"Media\\Textured_triangulated_Cube\\cube.jpg",
+		NULL, NULL,
+		&g_pTextureResourceView,		// This is returned.
+		NULL);
+	if (FAILED(hr))
+		return hr;
 
 
 	//**************************************************************************//
@@ -609,56 +625,56 @@ HRESULT InitDevice()
 	// we can do this only once.  Try to minimise the number of times you put	//
 	// textures into video memory, there is quite an overhead in doing so.		//
 	//**************************************************************************//
-	g_pImmediateContext->PSSetShaderResources( 0, 1, &g_pTextureResourceView );
+	g_pImmediateContext->PSSetShaderResources(0, 1, &g_pTextureResourceView);
 
 
-    // Create the sample state
-    D3D11_SAMPLER_DESC sampDesc;
-    ZeroMemory( &sampDesc, sizeof(sampDesc) );
-    sampDesc.Filter = D3D11_FILTER_MIN_MAG_MIP_LINEAR;
-    sampDesc.AddressU = D3D11_TEXTURE_ADDRESS_WRAP;
-    sampDesc.AddressV = D3D11_TEXTURE_ADDRESS_WRAP;
-    sampDesc.AddressW = D3D11_TEXTURE_ADDRESS_WRAP;
-    sampDesc.ComparisonFunc = D3D11_COMPARISON_NEVER;
-    sampDesc.MinLOD = 0;
-    sampDesc.MaxLOD = D3D11_FLOAT32_MAX;
-    hr = g_pd3dDevice->CreateSamplerState( &sampDesc, &g_pSamplerLinear );
-    if( FAILED( hr ) )
-        return hr;
+	// Create the sample state
+	D3D11_SAMPLER_DESC sampDesc;
+	ZeroMemory(&sampDesc, sizeof(sampDesc));
+	sampDesc.Filter = D3D11_FILTER_MIN_MAG_MIP_LINEAR;
+	sampDesc.AddressU = D3D11_TEXTURE_ADDRESS_WRAP;
+	sampDesc.AddressV = D3D11_TEXTURE_ADDRESS_WRAP;
+	sampDesc.AddressW = D3D11_TEXTURE_ADDRESS_WRAP;
+	sampDesc.ComparisonFunc = D3D11_COMPARISON_NEVER;
+	sampDesc.MinLOD = 0;
+	sampDesc.MaxLOD = D3D11_FLOAT32_MAX;
+	hr = g_pd3dDevice->CreateSamplerState(&sampDesc, &g_pSamplerLinear);
+	if (FAILED(hr))
+		return hr;
 
- 
 
-    //**************************************************************************//
+
+	//**************************************************************************//
 	// Update the constant buffer for stuff (the light vector and material		//
 	// colour in this case) that never change.  This is faster; don't update	//
 	// stuff if you don't have to.												//
 	//**************************************************************************//
 	CBNeverChanges cbNeverChanges;
 	cbNeverChanges.materialColour = XMFLOAT4(1, 1, 1, 1);		//Alpha does nothing.
-	cbNeverChanges.vecLight       = XMVectorSet(1, 1, -2, 0);	//4th value unused.
-	cbNeverChanges.vecLight       = XMVector3Normalize(cbNeverChanges.vecLight);
-    g_pImmediateContext->UpdateSubresource( g_pCBNeverChanges, 
-											0, NULL, 
-											&cbNeverChanges, 
-											0, 0 );
+	cbNeverChanges.vecLight = XMVectorSet(1, 1, -2, 0);	//4th value unused.
+	cbNeverChanges.vecLight = XMVector3Normalize(cbNeverChanges.vecLight);
+	g_pImmediateContext->UpdateSubresource(g_pCBNeverChanges,
+		0, NULL,
+		&cbNeverChanges,
+		0, 0);
 
 
 
-    //**************************************************************************//
+	//**************************************************************************//
 	// Creatre the projection matrix.  Generally you will only want to create	//
 	// this matrix once and then forget it.										//
 	//**************************************************************************//
- 	g_MatProjection = XMMatrixPerspectiveFovLH( XM_PIDIV4,			// Field of view (pi / 4 radians, or 45 degrees
-		                                     width / (FLOAT)height, // Aspect ratio.
-											 0.01f,					// Near clipping plane.
-											 100.0f );				// Far clipping plane.
-   
-    CBChangeOnResize cbChangesOnResize;
-    cbChangesOnResize.matProjection = XMMatrixTranspose( g_MatProjection );
-    g_pImmediateContext->UpdateSubresource( g_pCBChangeOnResize, 0, NULL, &cbChangesOnResize, 0, 0 );
+	g_MatProjection = XMMatrixPerspectiveFovLH(XM_PIDIV4,			// Field of view (pi / 4 radians, or 45 degrees
+		width / (FLOAT)height, // Aspect ratio.
+		0.01f,					// Near clipping plane.
+		100.0f);				// Far clipping plane.
+
+	CBChangeOnResize cbChangesOnResize;
+	cbChangesOnResize.matProjection = XMMatrixTranspose(g_MatProjection);
+	g_pImmediateContext->UpdateSubresource(g_pCBChangeOnResize, 0, NULL, &cbChangesOnResize, 0, 0);
 
 
-    return S_OK;
+	return S_OK;
 }
 
 
@@ -667,51 +683,51 @@ HRESULT InitDevice()
 //--------------------------------------------------------------------------------------
 void CleanupDevice()
 {
-    if( g_pImmediateContext ) g_pImmediateContext->ClearState();
+	if (g_pImmediateContext) g_pImmediateContext->ClearState();
 
-    if( g_pSamplerLinear ) g_pSamplerLinear->Release();
-    if( g_pTextureResourceView ) g_pTextureResourceView->Release();
-    if( g_pCBNeverChanges ) g_pCBNeverChanges->Release();
-    if( g_pCBChangeOnResize ) g_pCBChangeOnResize->Release();
-    if( g_pCBChangesEveryFrame ) g_pCBChangesEveryFrame->Release();
-    if( g_pVertexBuffer ) g_pVertexBuffer->Release();
-    if( g_pIndexBuffer ) g_pIndexBuffer->Release();
-    if( g_pVertexLayout ) g_pVertexLayout->Release();
-    if( g_pVertexShader ) g_pVertexShader->Release();
-    if( g_pPixelShader ) g_pPixelShader->Release();
-    if( g_pDepthStencil ) g_pDepthStencil->Release();
-    if( g_pDepthStencilView ) g_pDepthStencilView->Release();
-    if( g_pRenderTargetView ) g_pRenderTargetView->Release();
-    if( g_pSwapChain ) g_pSwapChain->Release();
-    if( g_pImmediateContext ) g_pImmediateContext->Release();
-    if( g_pd3dDevice ) g_pd3dDevice->Release();
+	if (g_pSamplerLinear) g_pSamplerLinear->Release();
+	if (g_pTextureResourceView) g_pTextureResourceView->Release();
+	if (g_pCBNeverChanges) g_pCBNeverChanges->Release();
+	if (g_pCBChangeOnResize) g_pCBChangeOnResize->Release();
+	if (g_pCBChangesEveryFrame) g_pCBChangesEveryFrame->Release();
+	if (g_pVertexBuffer) g_pVertexBuffer->Release();
+	if (g_pIndexBuffer) g_pIndexBuffer->Release();
+	if (g_pVertexLayout) g_pVertexLayout->Release();
+	if (g_pVertexShader) g_pVertexShader->Release();
+	if (g_pPixelShader) g_pPixelShader->Release();
+	if (g_pDepthStencil) g_pDepthStencil->Release();
+	if (g_pDepthStencilView) g_pDepthStencilView->Release();
+	if (g_pRenderTargetView) g_pRenderTargetView->Release();
+	if (g_pSwapChain) g_pSwapChain->Release();
+	if (g_pImmediateContext) g_pImmediateContext->Release();
+	if (g_pd3dDevice) g_pd3dDevice->Release();
 }
 
 
 //--------------------------------------------------------------------------------------
 // Called every time the application receives a message
 //--------------------------------------------------------------------------------------
-LRESULT CALLBACK WndProc( HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam )
+LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 {
-    PAINTSTRUCT ps;
-    HDC hdc;
+	PAINTSTRUCT ps;
+	HDC hdc;
 
-    switch( message )
-    {
-        case WM_PAINT:
-            hdc = BeginPaint( hWnd, &ps );
-            EndPaint( hWnd, &ps );
-            break;
+	switch (message)
+	{
+	case WM_PAINT:
+		hdc = BeginPaint(hWnd, &ps);
+		EndPaint(hWnd, &ps);
+		break;
 
-        case WM_DESTROY:
-            PostQuitMessage( 0 );
-            break;
+	case WM_DESTROY:
+		PostQuitMessage(0);
+		break;
 
-        default:
-            return DefWindowProc( hWnd, message, wParam, lParam );
-    }
+	default:
+		return DefWindowProc(hWnd, message, wParam, lParam);
+	}
 
-    return 0;
+	return 0;
 }
 
 
@@ -721,86 +737,86 @@ LRESULT CALLBACK WndProc( HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam 
 void Render()
 {
 	//**************************************************************************//
-    // Update our time.  This block is supposed to make the movement frame rate //
+	// Update our time.  This block is supposed to make the movement frame rate //
 	// independent, as the frame rate we get depends of the performance of our	//
 	// computer.  We may even be in reference (software emulation) mode, which	//
 	// is painfully slow.														//
 	//**************************************************************************//
-    static float t = 0.0f;
-    if( g_driverType == D3D_DRIVER_TYPE_REFERENCE )
-    {
-        t += ( float )XM_PI * 0.0125f;
-    }
-    else
-    {
-        static DWORD dwTimeStart = 0;
-        DWORD dwTimeCur = GetTickCount();
-        if( dwTimeStart == 0 )
-            dwTimeStart = dwTimeCur;
-        t = ( dwTimeCur - dwTimeStart ) / 1000.0f;
-    }
+	static float t = 0.0f;
+	if (g_driverType == D3D_DRIVER_TYPE_REFERENCE)
+	{
+		t += (float)XM_PI * 0.0125f;
+	}
+	else
+	{
+		static DWORD dwTimeStart = 0;
+		DWORD dwTimeCur = GetTickCount();
+		if (dwTimeStart == 0)
+			dwTimeStart = dwTimeCur;
+		t = (dwTimeCur - dwTimeStart) / 1000.0f;
+	}
 
-    // Rotate cube around the origin
-    XMMATRIX matCubeWorld = XMMatrixRotationY( t );
+	// Rotate cube around the origin
+	XMMATRIX matCubeWorld = XMMatrixRotationY(t);
 
- 
-    //
-    // Clear the back buffer
-    //
-    float ClearColor[4] = { 0.0f, 0.125f, 0.3f, 1.0f }; // red, green, blue, alpha
-    g_pImmediateContext->ClearRenderTargetView( g_pRenderTargetView, ClearColor );
 
-    //
-    // Clear the depth buffer to 1.0 (max depth)
-    //
-    g_pImmediateContext->ClearDepthStencilView( g_pDepthStencilView, D3D11_CLEAR_DEPTH, 1.0f, 0 );
+	//
+	// Clear the back buffer
+	//
+	float ClearColor[4] = { 0.0f, 0.125f, 0.3f, 1.0f }; // red, green, blue, alpha
+	g_pImmediateContext->ClearRenderTargetView(g_pRenderTargetView, ClearColor);
+
+	//
+	// Clear the depth buffer to 1.0 (max depth)
+	//
+	g_pImmediateContext->ClearDepthStencilView(g_pDepthStencilView, D3D11_CLEAR_DEPTH, 1.0f, 0);
 
 
 
 	//**************************************************************************//
-    // Initialize the view matrix.  What you do to the viewer matrix moves the  //
+	// Initialize the view matrix.  What you do to the viewer matrix moves the  //
 	// viewer, or course.														//
 	//																			//
 	// The viewer matrix is created every frame here, which looks silly as the	//
 	// viewer never moves.  However in general your viewer does move.			//
 	//**************************************************************************//
-    XMVECTOR Eye = XMVectorSet( 0.0f, 1.0f, -3.0f, 0.0f );
-    XMVECTOR At = XMVectorSet( 0.0f, 0.0f, 0.0f, 0.0f );
-    XMVECTOR Up = XMVectorSet( 0.0f, 1.0f, 0.0f, 0.0f );
-	
-	XMMATRIX matView = XMMatrixLookAtLH( Eye,	// The eye, or viewer's position.
-										 At,	// The look at point.
-										 Up );	// Which way is up.
+	XMVECTOR Eye = XMVectorSet(0.0f, 1.0f, -3.0f, 0.0f);
+	XMVECTOR At = XMVectorSet(0.0f, 0.0f, 0.0f, 0.0f);
+	XMVECTOR Up = XMVectorSet(0.0f, 1.0f, 0.0f, 0.0f);
+
+	XMMATRIX matView = XMMatrixLookAtLH(Eye,	// The eye, or viewer's position.
+		At,	// The look at point.
+		Up);	// Which way is up.
 
 
 
 	XMMATRIX matWVP = matCubeWorld * matView * g_MatProjection;
-    //
-    // Update variables that change once per frame
-    //
-    CBChangesEveryFrame cb;
-    cb.matWorld                = XMMatrixTranspose( matCubeWorld );
-	cb.matWorldViewProjection  = XMMatrixTranspose( matWVP);
-    g_pImmediateContext->UpdateSubresource( g_pCBChangesEveryFrame, 0, NULL, &cb, 0, 0 );
+	//
+	// Update variables that change once per frame
+	//
+	CBChangesEveryFrame cb;
+	cb.matWorld = XMMatrixTranspose(matCubeWorld);
+	cb.matWorldViewProjection = XMMatrixTranspose(matWVP);
+	g_pImmediateContext->UpdateSubresource(g_pCBChangesEveryFrame, 0, NULL, &cb, 0, 0);
 
 
 
-    //
-    // Render the cube
-    //
-    g_pImmediateContext->VSSetShader( g_pVertexShader, NULL, 0 );
-    g_pImmediateContext->PSSetConstantBuffers( 0, 1, &g_pCBNeverChanges );		//Note this one belongs to the pixel shader.
-    g_pImmediateContext->VSSetConstantBuffers( 0, 1, &g_pCBChangeOnResize );	// Paremeter 1 relates to pisition in 
-    g_pImmediateContext->VSSetConstantBuffers( 1, 1, &g_pCBChangesEveryFrame );	// constant buffers.
-    g_pImmediateContext->PSSetShader( g_pPixelShader, NULL, 0 );
-    g_pImmediateContext->PSSetConstantBuffers( 2, 1, &g_pCBChangesEveryFrame );
-     g_pImmediateContext->PSSetSamplers( 0, 1, &g_pSamplerLinear );
-	 g_pImmediateContext->DrawIndexed( g_numIndices, 0, 0 );
+	//
+	// Render the cube
+	//
+	g_pImmediateContext->VSSetShader(g_pVertexShader, NULL, 0);
+	g_pImmediateContext->PSSetConstantBuffers(0, 1, &g_pCBNeverChanges);		//Note this one belongs to the pixel shader.
+	g_pImmediateContext->VSSetConstantBuffers(0, 1, &g_pCBChangeOnResize);	// Paremeter 1 relates to pisition in 
+	g_pImmediateContext->VSSetConstantBuffers(1, 1, &g_pCBChangesEveryFrame);	// constant buffers.
+	g_pImmediateContext->PSSetShader(g_pPixelShader, NULL, 0);
+	g_pImmediateContext->PSSetConstantBuffers(2, 1, &g_pCBChangesEveryFrame);
+	g_pImmediateContext->PSSetSamplers(0, 1, &g_pSamplerLinear);
+	g_pImmediateContext->DrawIndexed(g_numIndices, 0, 0);
 
-    //
-    // Present our back buffer to our front buffer
-    //
-    g_pSwapChain->Present( 0, 0 );
+	//
+	// Present our back buffer to our front buffer
+	//
+	g_pSwapChain->Present(0, 0);
 }
 
 
@@ -815,7 +831,7 @@ void charStrToWideChar(WCHAR *dest, char *source)
 {
 	int length = strlen(source);
 	for (int i = 0; i <= length; i++)
-		dest[i] = (WCHAR) source[i];
+		dest[i] = (WCHAR)source[i];
 }
 
 
@@ -826,13 +842,13 @@ void charStrToWideChar(WCHAR *dest, char *source)
 //**************************************************************************//
 void XMFLOAT3normalise(XMFLOAT3 *toNormalise)
 {
-	float magnitude = (toNormalise->x * toNormalise->x 
-		             + toNormalise->y * toNormalise->y
-					 + toNormalise->z * toNormalise->z);
+	float magnitude = (toNormalise->x * toNormalise->x
+		+ toNormalise->y * toNormalise->y
+		+ toNormalise->z * toNormalise->z);
 
 	magnitude = sqrt(magnitude);
-	toNormalise->x /= magnitude;	
-	toNormalise->y /= magnitude;	
+	toNormalise->x /= magnitude;
+	toNormalise->y /= magnitude;
 	toNormalise->z /= magnitude;
 }
 
@@ -844,18 +860,18 @@ void XMFLOAT3normalise(XMFLOAT3 *toNormalise)
 //																			//
 // I nicked them from the Internet, which is why they are incomprehensible.	//
 //**************************************************************************//
-std::wstring TrimStart(std::wstring s) 
+std::wstring TrimStart(std::wstring s)
 {
-        s.erase(s.begin(), std::find_if(s.begin(), 
-			    s.end(), std::not1(std::ptr_fun<int, int>(std::isspace))));
-        return s;
+	s.erase(s.begin(), std::find_if(s.begin(),
+		s.end(), std::not1(std::ptr_fun<int, int>(std::isspace))));
+	return s;
 }
 
-std::wstring TrimEnd(std::wstring s) 
+std::wstring TrimEnd(std::wstring s)
 {
-        s.erase(std::find_if(s.rbegin(), s.rend(), 
-			std::not1(std::ptr_fun<int, int>(std::isspace))).base(), s.end());
-        return s;
+	s.erase(std::find_if(s.rbegin(), s.rend(),
+		std::not1(std::ptr_fun<int, int>(std::isspace))).base(), s.end());
+	return s;
 }
 
 struct VertexXY
@@ -871,7 +887,31 @@ struct VertexXYZ
 	float x, y, z;
 };
 
+bool XMFloat3Match(XMFLOAT3 f1, XMFLOAT3 f2)
+{
+	return (f1.x == f2.x && f1.y == f2.y && f1.z == f2.z);
+}
 
+bool XMFloat2Match(XMFLOAT2 f1, XMFLOAT2 f2)
+{
+	return (f1.x == f2.x && f1.y == f2.y);
+}
+
+bool SimpleVerticesMatch(SimpleVertex sv1, SimpleVertex sv2)
+{
+	return (XMFloat3Match(sv1.Pos, sv2.Pos) && XMFloat3Match(sv1.VecNormal, sv2.VecNormal) && XMFloat2Match(sv1.Tex, sv2.Tex));
+}
+
+bool TriangleMeshesMatch(TriangleMesh t1, TriangleMesh t2)
+{
+	return (SimpleVerticesMatch(t1.v1, t2.v1) && SimpleVerticesMatch(t1.v2, t2.v2) && SimpleVerticesMatch(t1.v3, t2.v3));
+}
+
+void AddToVertices(SortOfMeshSubset *mesh, SimpleVertex vertex)
+{
+	mesh->vertices->push_back(vertex);
+	mesh->indexes->push_back(mesh->vertices->size() -1);
+}
 
 //**************************************************************************//
 // Load the obj file into an array.  Everything here is wide (unicode)		//
@@ -892,6 +932,8 @@ SortOfMeshSubset *LoadMesh(LPSTR objFilePath)
 {
 	std::wifstream          fileStream;
 	std::wstring            line;
+	std::vector <TriangleMesh> testVector(0);
+	std::vector <Row> faces(0);
 	std::vector <VertexXYZ> vectorVertices(0);
 	std::vector <VertexXY> vectorTextureVertices(0);
 	std::vector <VertexXYZ> vectorNormal(0);
@@ -901,10 +943,10 @@ SortOfMeshSubset *LoadMesh(LPSTR objFilePath)
 	bool isOpen = fileStream.is_open();		//debugging only.
 
 
-	while(std::getline(fileStream, line))
+	while (std::getline(fileStream, line))
 	{
 		line = TrimStart(line);
-		
+
 		//Get name of .mtl file
 		if (line.compare(0, 7, L"mtllib ") == 0)
 		{
@@ -914,7 +956,7 @@ SortOfMeshSubset *LoadMesh(LPSTR objFilePath)
 			WCHAR oldStyleStr[200];
 			wcscpy(oldStyleStr, line.c_str());
 			swscanf(oldStyleStr, L"%6s%s", first, mtlFileName);
-			
+
 			//get length of mtlFileName
 			int mtlNameLength = 0;
 			for (int i = 0; i < 200; i++)
@@ -934,7 +976,7 @@ SortOfMeshSubset *LoadMesh(LPSTR objFilePath)
 
 			//get length of obj file name
 			int fileNameLength = 0;
-			for (int i = objFilePathLength -1; i >= 0; i--)
+			for (int i = objFilePathLength - 1; i >= 0; i--)
 			{
 				if (objFilePath[i] == '\\')
 				{
@@ -957,7 +999,7 @@ SortOfMeshSubset *LoadMesh(LPSTR objFilePath)
 					objParentPath[i] = NULL;
 					break;
 				}
-				
+
 			}
 
 			//Parse .mtl file
@@ -980,7 +1022,7 @@ SortOfMeshSubset *LoadMesh(LPSTR objFilePath)
 
 			WCHAR oldStyleStr[200];
 			wcscpy(oldStyleStr, line.c_str());
-			swscanf(oldStyleStr, L"%2s%f%f%f", first, &x, &y, &z); 
+			swscanf(oldStyleStr, L"%2s%f%f%f", first, &x, &y, &z);
 
 			VertexXYZ v;
 			v.x = x; v.y = y; v.z = z;
@@ -1017,7 +1059,6 @@ SortOfMeshSubset *LoadMesh(LPSTR objFilePath)
 			vectorNormal.push_back(v);
 		}
 
-
 		//******************************************************************//
 		// If true, we have found a face.   Read it in as a 2 character		//
 		// string, followed by 3 decimal numbers.	Suprisingly the C++		//
@@ -1037,23 +1078,66 @@ SortOfMeshSubset *LoadMesh(LPSTR objFilePath)
 			WCHAR slash5[5];
 			WCHAR slash6[5];
 
-			UINT v1, vt1, vn1, v2, vt2, vn2, v3, vt3, vn3; 
+			UINT v1, vt1, vn1, v2, vt2, vn2, v3, vt3, vn3;
 
 			WCHAR oldStyleStr[200];
 			wcscpy(oldStyleStr, line.c_str());
-			swscanf(oldStyleStr, L"%2s%d%1s%d%1s%d%d%1s%d%1s%d%d%1s%d%1s%d", first, 
-										&v1, slash1, &vt1, slash2, &vn1, 
-				                        &v2, slash3, &vt2, slash4, &vn2, 
-										&v3, slash5, &vt3, slash6, &vn3); 
+			swscanf(oldStyleStr, L"%2s%d%1s%d%1s%d%d%1s%d%1s%d%d%1s%d%1s%d", first,
+				&v1, slash1, &vt1, slash2, &vn1,
+				&v2, slash3, &vt2, slash4, &vn2,
+				&v3, slash5, &vt3, slash6, &vn3);
 
-			vectorIndices.push_back(v1-1);	// Check this carefully; see below
-			vectorIndices.push_back(v2-1);
-			vectorIndices.push_back(v3-1);
+			Row row;
+
+			SimpleVertex vert1, vert2, vert3;
+			vert1.Pos.x = vectorVertices[v1 - 1].x;
+			vert1.Pos.y = vectorVertices[v1 - 1].y;
+			vert1.Pos.z = vectorVertices[v1 - 1].z;
+			vert1.Tex.x = vectorTextureVertices[vt1 - 1].x;
+			vert1.Tex.y = vectorTextureVertices[vt1 - 1].y;
+			vert1.VecNormal.x = vectorNormal[vn1 - 1].x;
+			vert1.VecNormal.y = vectorNormal[vn1 - 1].y;
+			vert1.VecNormal.z = vectorNormal[vn1 - 1].z;
+
+			row.a.v = v1 - 1;
+			row.a.vt = vt1 - 1;
+			row.a.vn = vn1 - 1;
+
+			vert2.Pos.x = vectorVertices[v2 - 1].x;
+			vert2.Pos.y = vectorVertices[v2 - 1].y;
+			vert2.Pos.z = vectorVertices[v2 - 1].z;
+			vert2.Tex.x = vectorTextureVertices[vt2 - 1].x;
+			vert2.Tex.y = vectorTextureVertices[vt2 - 1].y;
+			vert2.VecNormal.x = vectorNormal[vn2 - 1].x;
+			vert2.VecNormal.y = vectorNormal[vn2 - 1].y;
+			vert2.VecNormal.z = vectorNormal[vn2 - 1].z;
+
+			row.b.v = v2 - 1;
+			row.b.vt = vt2 - 1;
+			row.b.vn = vn2 - 1;
+
+			vert3.Pos.x = vectorVertices[v3 - 1].x;
+			vert3.Pos.y = vectorVertices[v3 - 1].y;
+			vert3.Pos.z = vectorVertices[v3 - 1].z;
+			vert3.Tex.x = vectorTextureVertices[vt3 - 1].x;
+			vert3.Tex.y = vectorTextureVertices[vt3 - 1].y;
+			vert3.VecNormal.x = vectorNormal[vn3 - 1].x;
+			vert3.VecNormal.y = vectorNormal[vn3 - 1].y;
+			vert3.VecNormal.z = vectorNormal[vn3 - 1].z;
+
+			row.c.v = v3 - 1;
+			row.c.vt = vt3 - 1;
+			row.c.vn = vn3 - 1;
+
+			TriangleMesh face = { vert1, vert2, vert3 };
+
+			faces.push_back(row);
+			testVector.push_back(face);
 		}
 	}
 
 
-	
+
 	//******************************************************************//
 	// Now build up the arrays.											//
 	//																	// 
@@ -1062,40 +1146,112 @@ SortOfMeshSubset *LoadMesh(LPSTR objFilePath)
 	//																	//
 	// See abobe wih the -1s.  Sorted?									//
 	//******************************************************************//
-	SortOfMeshSubset *mesh  = new SortOfMeshSubset;
-	std::vector <Face> faces(vectorIndices.size() / 3);
+	SortOfMeshSubset *mesh = new SortOfMeshSubset;
 
 
-	mesh->numVertices = (USHORT) vectorVertices.size();
-	std::vector <SimpleVertex> tempVertices(mesh->numVertices);
-	mesh->vertices = &tempVertices;
 
-	for (int i = 0; i < mesh->numVertices; i++)
+	int index = 0;
+	int testVectorSize = testVector.size();
+	std::vector <SimpleVertex> temp;
+	std::vector <USHORT> temp2;
+	mesh->vertices = &temp;
+	mesh->indexes = &temp2;
+
+	//Enter first vertex, adds to index
+	AddToVertices(mesh, testVector[0].v1);
+
+	bool v1Samev2 = SimpleVerticesMatch(testVector[0].v1, testVector[0].v2);
+	bool v1Samev3 = SimpleVerticesMatch(testVector[0].v1, testVector[0].v3);
+
+
+	if (v1Samev2)
 	{
-		mesh->vertices->at(i) = tempVertices.at(i);
+		mesh->indexes->push_back(0);
+	}
+	else
+	{
+		AddToVertices(mesh, testVector[0].v2);
 	}
 
-	for (int i = 0; i < mesh->numVertices; i++)
+	if (v1Samev3)
 	{
-		mesh->vertices->at(i).Pos.x			= vectorVertices[i].x;
-		mesh->vertices->at(i).Pos.y			= vectorVertices[i].y;
-		mesh->vertices->at(i).Pos.z			= vectorVertices[i].z;
-		mesh->vertices->at(i).VecNormal.x	= vectorNormal[i].x;
-		mesh->vertices->at(i).VecNormal.y	= vectorNormal[i].y;
-		mesh->vertices->at(i).VecNormal.z	= vectorNormal[i].z;
-		mesh->vertices->at(i).Tex.x		= vectorTextureVertices[i].x;
-		mesh->vertices->at(i).Tex.y		= vectorTextureVertices[i].y;
+		mesh->indexes->push_back(0);
+	}
+	else
+	{
+		AddToVertices(mesh, testVector[0].v3);
 	}
 
-	mesh->numIndices = (USHORT) vectorIndices.size() / 3;
-	mesh->indexes = &faces;
-	
-	//Populate faces with vertices
-	for (int i = 0; i < mesh->numIndices; i = i++)
+	for (int i = 0; i < testVectorSize; i++)
 	{
-		mesh->indexes->at(i).v1 = &vectorIndices[i];
-		mesh->indexes->at(i).v2 = &vectorIndices[i+1];
-		mesh->indexes->at(i).v3 = &vectorIndices[i+2];
+		bool vertex1NotFound = true;
+		bool vertex2NotFound = true;
+		bool vertex3NotFound = true;
+		int v1FoundIndex;
+		int v2FoundIndex;
+		int v3FoundIndex;
+		//Compare to all other vertices
+		for (int j = 0; j < mesh->vertices->size(); j++)
+		{
+			if (SimpleVerticesMatch(mesh->vertices->at(j), testVector[i].v1))
+			{
+				vertex1NotFound = false;
+			}
+			else
+			{
+				v1FoundIndex = j;
+			}
+
+			if (SimpleVerticesMatch(mesh->vertices->at(j), testVector[i].v2))
+			{
+				vertex2NotFound = false;
+			}
+			else
+			{
+				v2FoundIndex = j;
+			}
+
+			if (SimpleVerticesMatch(mesh->vertices->at(j), testVector[i].v3))
+			{
+				vertex3NotFound = false;
+			}
+			else
+			{
+				v3FoundIndex = j;
+			}
+
+			if (!vertex1NotFound && !vertex2NotFound && !vertex3NotFound)
+			{
+				break;
+			}
+		}
+
+		if (vertex1NotFound)
+		{
+			AddToVertices(mesh, testVector[0].v1);
+		}
+		else
+		{
+			mesh->indexes->push_back(v1FoundIndex);
+		}
+
+		if (vertex2NotFound)
+		{
+			AddToVertices(mesh, testVector[0].v2);
+		}
+		else
+		{
+			mesh->indexes->push_back(v2FoundIndex);
+		}
+
+		if (vertex3NotFound)
+		{
+			AddToVertices(mesh, testVector[0].v3);
+		}
+		else
+		{
+			mesh->indexes->push_back(v3FoundIndex);
+		}
 	}
 
 	//Close filestream, not sure if this was supposed to be left open?
