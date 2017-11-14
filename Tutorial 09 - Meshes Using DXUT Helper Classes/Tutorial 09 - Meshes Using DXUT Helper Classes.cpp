@@ -370,25 +370,25 @@ void CALLBACK OnFrameMove( double fTime, float fElapsedTime, void* pUserContext 
 		if (g_Tiger.g_f_TigerSpeed >= 0)
 		{
 			//Halt if slow
-			if (g_Tiger.g_f_TigerSpeed - (fElapsedTime / 2) < 0)
+			if (g_Tiger.g_f_TigerSpeed - (fElapsedTime / 1.1) < 0)
 			{
 				g_Tiger.g_f_TigerSpeed = 0;
 			}
 			else //Slow down
 			{
-				g_Tiger.g_f_TigerSpeed -= (fElapsedTime / 2);
+				g_Tiger.g_f_TigerSpeed -= (fElapsedTime / 1.1);
 			}
 		}
 		else //Moving Backwards
 		{
 			//Halt if slow
-			if (g_Tiger.g_f_TigerSpeed + (fElapsedTime / 2) > 0)
+			if (g_Tiger.g_f_TigerSpeed + (fElapsedTime / 1.1) > 0)
 			{
 				g_Tiger.g_f_TigerSpeed = 0;
 			}
 			else // Slow down
 			{
-				g_Tiger.g_f_TigerSpeed += (fElapsedTime / 2);
+				g_Tiger.g_f_TigerSpeed += (fElapsedTime / 1.1);
 			}
 		}
 		
@@ -767,8 +767,16 @@ void CALLBACK OnD3D11FrameRender( ID3D11Device* pd3dDevice, ID3D11DeviceContext*
 
 	float tigerScaleConstant = 1.5f;
 	int arseHeightOffset = 2;
-	float rotation = sin(timeGetTime() / 300.0);
-	float rotation2 = cos(timeGetTime() / 300.0);
+	float rotation = 0;
+	float rotation2 = 0;
+
+
+	if (g_Tiger.g_f_TigerSpeed > 0)
+	{
+		PlaySound(L"Media\\Sounds\\wings.wav", NULL, SND_ASYNC | SND_NOSTOP);
+		rotation = sin(timeGetTime() / 210.0);
+		rotation2 = cos(timeGetTime() / 210.0);
+	}
 
 	//Tiger Movement
 	XMMATRIX matTigerRotate = XMMatrixRotationY(g_Tiger.g_f_TigerRY);
