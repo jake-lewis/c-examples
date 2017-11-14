@@ -60,7 +60,7 @@ struct SimpleVertex
 {
     XMFLOAT3 Pos;	//Why not a float4?  See the shader strucrure.  Any thoughts?  Nigel
 	XMFLOAT3 VecNormal;
-    XMFLOAT2 TexUV;
+    XMFLOAT2 Tex;
 };
 
 
@@ -884,7 +884,9 @@ SortOfMeshSubset *LoadMesh(LPSTR objFilePath)
 	std::vector <VertexXYZ> vectorVertices(0);
 	std::vector <VertexXY> vectorTextureVertices(0);
 	std::vector <VertexXYZ> vectorNormal(0);
-	std::vector <USHORT>    vectorIndices(0);
+	std::vector <USHORT>    vertexIndices(0);
+	std::vector <USHORT>	normalIndices(0);
+	std::vector <USHORT>	textureIndices(0);
 
 	fileStream.open(objFilePath);
 	bool isOpen = fileStream.is_open();		//debugging only.
@@ -1036,9 +1038,15 @@ SortOfMeshSubset *LoadMesh(LPSTR objFilePath)
 				                        &v2, slash3, &vt2, slash4, &vn2, 
 										&v3, slash5, &vt3, slash6, &vn3); 
 
-			vectorIndices.push_back(v1-1);	// Check this carefully; see below
-			vectorIndices.push_back(v2-1);
-			vectorIndices.push_back(v3-1);
+			vertexIndices.push_back(v1-1);	// Check this carefully; see below
+			vertexIndices.push_back(v2-1);
+			vertexIndices.push_back(v3-1);
+			normalIndices.push_back(vn1 - 1);
+			normalIndices.push_back(vn2 - 1);
+			normalIndices.push_back(vn3 - 1);
+			textureIndices.push_back(vt1 - 1);
+			textureIndices.push_back(vt2 - 1);
+			textureIndices.push_back(vt3 - 1);
 		}
 	}
 
@@ -1061,18 +1069,20 @@ SortOfMeshSubset *LoadMesh(LPSTR objFilePath)
 		mesh->vertices[i].Pos.x			= vectorVertices[i].x;
 		mesh->vertices[i].Pos.y			= vectorVertices[i].y;
 		mesh->vertices[i].Pos.z			= vectorVertices[i].z;
-		mesh->vertices[i].VecNormal.x	= vectorNormal[i].x;
-		mesh->vertices[i].VecNormal.y	= vectorNormal[i].y;
-		mesh->vertices[i].VecNormal.z	= vectorNormal[i].z;
-		mesh->vertices[i].TexUV.x		= vectorTextureVertices[i].x;
-		mesh->vertices[i].TexUV.y		= vectorTextureVertices[i].y;
 	}
 
-	mesh->numIndices = (USHORT) vectorIndices.size();
+	mesh->numIndices = (USHORT) vertexIndices.size();
 	mesh->indexes    = new USHORT[mesh->numIndices];
 	for (int i = 0; i < mesh->numIndices; i++)
 	{
-		mesh->indexes[i] = vectorIndices[i];
+		mesh->indexes[i] = vertexIndices[i];
+
+		//Set normals and textures of indexed vertices according to their respective indices
+		mesh->vertices[mesh->indexes[i]].VecNormal.x = vectorNormal[normalIndices[i]].x;
+		mesh->vertices[mesh->indexes[i]].VecNormal.y = vectorNormal[normalIndices[i]].y;
+		mesh->vertices[mesh->indexes[i]].VecNormal.z = vectorNormal[normalIndices[i]].z;
+		mesh->vertices[mesh->indexes[i]].Tex.x = vectorTextureVertices[textureIndices[i]].x;
+		mesh->vertices[mesh->indexes[i]].Tex.y = vectorTextureVertices[textureIndices[i]].y;
 	}
 	
 	return mesh;
