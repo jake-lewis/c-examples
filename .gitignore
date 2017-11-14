@@ -333,3 +333,4 @@ paket-files/
 # JetBrains Rider
 .idea/
 *.sln.iml
+/OBJ Loader/debugOutput.txt

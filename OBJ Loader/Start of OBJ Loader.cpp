@@ -167,7 +167,7 @@ void Render();
 void charStrToWideChar(WCHAR *dest, char *source);
 void XMFLOAT3normalise(XMFLOAT3 *toNormalise);
 SortOfMeshSubset *LoadMesh(LPSTR filename);
-void ParseMtlFile(WCHAR *mtlPath);
+void ParseMtlFile(WCHAR *mtlPath, WCHAR *parentPath);
 
 
 
@@ -480,8 +480,8 @@ HRESULT InitDevice()
 	// Load the obj mesh, NOT COMPLETE.											//
 	//**************************************************************************//	
 	//SortOfMeshSubset *sortOfMesh = LoadMesh("Media\\Cup\\Cup.obj");
-	//SortOfMeshSubset *sortOfMesh = LoadMesh("Media\\Textured_triangulated_Cube\\cube.obj");
-	SortOfMeshSubset *sortOfMesh = LoadMesh("Media\\pig\\pig.obj");
+	SortOfMeshSubset *sortOfMesh = LoadMesh("Media\\Textured_triangulated_Cube\\cube.obj");
+	//SortOfMeshSubset *sortOfMesh = LoadMesh("Media\\pig\\pig.obj");
 
 	//**************************************************************************//
 	// Create the vertex buffer.												//
@@ -563,28 +563,6 @@ HRESULT InitDevice()
 	hr = g_pd3dDevice->CreateBuffer(&bd, NULL, &g_pCBChangesEveryFrame);
 	if (FAILED(hr))
 		return hr;
-
-
-
-	//**************************************************************************//
-	// Load the texture into "ordinary" RAM.									//
-	//**************************************************************************//
-	hr = D3DX11CreateShaderResourceViewFromFile(g_pd3dDevice,
-		L"Media\\pig\\pig_d.jpg",
-		NULL, NULL,
-		&g_pTextureResourceView,		// This is returned.
-		NULL);
-	if (FAILED(hr))
-		return hr;
-
-
-	//**************************************************************************//
-	// Put the texture in shader (video) memory.  As there is only one texture,	//
-	// we can do this only once.  Try to minimise the number of times you put	//
-	// textures into video memory, there is quite an overhead in doing so.		//
-	//**************************************************************************//
-	g_pImmediateContext->PSSetShaderResources(0, 1, &g_pTextureResourceView);
-
 
 	// Create the sample state
 	D3D11_SAMPLER_DESC sampDesc;
@@ -889,20 +867,6 @@ SortOfMeshSubset *LoadMesh(LPSTR objFilePath)
 			wcscpy(oldStyleStr, line.c_str());
 			swscanf(oldStyleStr, L"%6s%s", first, mtlFileName);
 
-			//get length of mtlFileName
-			int mtlNameLength = 0;
-			for (int i = 0; i < 200; i++)
-			{
-				if (mtlFileName[i] != NULL)
-				{
-					mtlNameLength++;
-				}
-				else
-				{
-					break;
-				}
-			}
-
 			//Get length of the obj file path
 			int objFilePathLength = strlen(objFilePath);
 
@@ -938,7 +902,7 @@ SortOfMeshSubset *LoadMesh(LPSTR objFilePath)
 			WCHAR mtlFullPath[200];
 			wcscpy(mtlFullPath, objParentPath);
 			wcscat(mtlFullPath, mtlFileName);
-			ParseMtlFile(mtlFullPath);
+			ParseMtlFile(mtlFullPath, objParentPath);
 		}
 
 		//******************************************************************//
@@ -1056,6 +1020,11 @@ SortOfMeshSubset *LoadMesh(LPSTR objFilePath)
 
 	mesh->numIndices = (USHORT)vertexIndices.size();
 	mesh->indexes = new USHORT[mesh->numIndices];
+
+	using namespace std;
+	ofstream outFile;
+	outFile.open("debugOutput.txt");
+
 	for (int i = 0; i < mesh->numIndices; i++)
 	{
 		mesh->indexes[i] = vertexIndices[i];
@@ -1066,7 +1035,30 @@ SortOfMeshSubset *LoadMesh(LPSTR objFilePath)
 		mesh->vertices[mesh->indexes[i]].VecNormal.z = vectorNormal[normalIndices[i]].z;
 		mesh->vertices[mesh->indexes[i]].Tex.x = vectorTextureVertices[textureIndices[i]].x;
 		mesh->vertices[mesh->indexes[i]].Tex.y = vectorTextureVertices[textureIndices[i]].y;
+
 	}
+
+	for (int i = 0; i < vectorVertices.size(); i++)
+	{
+		outFile << "v " << vectorVertices[i].x << " " << vectorVertices[i].y << " " << vectorVertices[i].z << "\n";
+	}
+
+	for (int i = 0; i < vectorTextureVertices.size(); i++)
+	{
+		outFile << "vt " << vectorTextureVertices[i].x << " " << vectorTextureVertices[i].y << "\n";
+	}
+
+	for (int i = 0; i < vectorNormal.size(); i++)
+	{
+		outFile << "vn " << vectorNormal[i].x << " " << vectorNormal[i].y << " " << vectorNormal[i].z << "\n";
+	}
+
+	for (int i = 0; i < mesh->numIndices; i = i + 3)
+	{
+		outFile << "f " << mesh->indexes[i] + 1 << "/" << textureIndices[i] + 1 << "/" << normalIndices[i] + 1 << " " << mesh->indexes[i + 1] + 1 << "/" << textureIndices[i + 1] + 1 << "/" << normalIndices[i + 1] + 1 << " " << mesh->indexes[i + 2] + 1 << "/" << textureIndices[i + 2] + 1 << "/" << normalIndices[i + 2] + 1 << "\n";
+	}
+
+	outFile.close();
 
 	//Close filestream, not sure if this was supposed to be left open?
 	fileStream.close();
@@ -1074,7 +1066,7 @@ SortOfMeshSubset *LoadMesh(LPSTR objFilePath)
 	return mesh;
 }
 
-void ParseMtlFile(WCHAR *mtlPath)
+void ParseMtlFile(WCHAR *mtlPath, WCHAR *parentPath)
 {
 	std::wifstream          fileStream;
 	std::wstring            line;
@@ -1086,9 +1078,39 @@ void ParseMtlFile(WCHAR *mtlPath)
 	{
 		line = TrimStart(line);
 
-		if (line.compare(0, 7, L"mtllib ") == 0)
+		if (line.compare(0, 7, L"newmtl ") == 0)
 		{
+			WCHAR first[7];
+			WCHAR mtlName[50];
 
+			WCHAR oldStyleStr[57];
+			wcscpy(oldStyleStr, line.c_str());
+			swscanf(oldStyleStr, L"%6s%s", first, mtlName);
+		}
+
+		if (line.compare(0, 7, L"map_Kd ") == 0)
+		{
+			WCHAR first[7];
+			WCHAR texture[50];
+
+			WCHAR oldStyleStr[57];
+			wcscpy(oldStyleStr, line.c_str());
+			swscanf(oldStyleStr, L"%6s%s", first, texture);
+
+			WCHAR texturePath[200];
+			wcscpy(texturePath, parentPath);
+			wcscat(texturePath, texture);
+
+			HRESULT hr = D3DX11CreateShaderResourceViewFromFile(g_pd3dDevice,
+				texturePath,
+				NULL, NULL,
+				&g_pTextureResourceView,		// This is returned.
+				NULL);
+
+			if (hr == S_OK)
+			{
+				g_pImmediateContext->PSSetShaderResources(0, 1, &g_pTextureResourceView);
+			}
 		}
 	}
 
