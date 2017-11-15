@@ -66,7 +66,7 @@ struct SimpleVertex
 //**************************************************************************//
 // A sort of mesh subset, basically an array of vertices and indexes.		//
 //**************************************************************************//
-struct SortOfMeshSubset
+struct BasicMesh
 {
 	SimpleVertex *vertices;
 	USHORT       *indexes;
@@ -166,7 +166,7 @@ LRESULT CALLBACK    WndProc(HWND, UINT, WPARAM, LPARAM);
 void Render();
 void charStrToWideChar(WCHAR *dest, char *source);
 void XMFLOAT3normalise(XMFLOAT3 *toNormalise);
-SortOfMeshSubset *LoadMesh(LPSTR filename);
+BasicMesh *LoadMesh(LPSTR filename);
 void ParseMtlFile(WCHAR *mtlPath, WCHAR *parentPath);
 
 
@@ -479,9 +479,9 @@ HRESULT InitDevice()
 	//**************************************************************************//
 	// Load the obj mesh, NOT COMPLETE.											//
 	//**************************************************************************//	
-	//SortOfMeshSubset *sortOfMesh = LoadMesh("Media\\Cup\\Cup.obj");
-	SortOfMeshSubset *sortOfMesh = LoadMesh("Media\\Textured_triangulated_Cube\\cube.obj");
-	//SortOfMeshSubset *sortOfMesh = LoadMesh("Media\\pig\\pig.obj");
+	//BasicMesh *sortOfMesh = LoadMesh("Media\\Cup\\Cup.obj");
+	//BasicMesh *sortOfMesh = LoadMesh("Media\\Textured_triangulated_Cube\\cube.obj");
+	BasicMesh *sortOfMesh = LoadMesh("Media\\pig\\pig.obj");
 
 	//**************************************************************************//
 	// Create the vertex buffer.												//
@@ -838,7 +838,7 @@ struct VertexXYZ
 //																			//
 // ...And only works with meshes in exactly the right format.				//
 //**************************************************************************//
-SortOfMeshSubset *LoadMesh(LPSTR objFilePath)
+BasicMesh *LoadMesh(LPSTR objFilePath)
 {
 	std::wifstream          fileStream;
 	std::wstring            line;
@@ -1005,7 +1005,7 @@ SortOfMeshSubset *LoadMesh(LPSTR objFilePath)
 	//																	//
 	// See abobe wih the -1s.  Sorted?									//
 	//******************************************************************//
-	SortOfMeshSubset *mesh = new SortOfMeshSubset;
+	BasicMesh *mesh = new BasicMesh;
 
 
 
