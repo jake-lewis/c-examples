@@ -99,9 +99,6 @@ float4 PS_NOLIGHTING_DXUTSDKMesh(PS_INPUT Input) : SV_TARGET
 {
 	float4 vDiffuse = g_txDiffuse.Sample(g_samLinear, Input.vTexcoord);
 
-	float fLighting = saturate(dot(g_vLightDir, Input.vNormal));
-	fLighting = max(fLighting, g_fAmbient);
-
 	//**********************************************************************//
 	// With lighting, or un-comment the line below to remove the lighting.	//
 	//**********************************************************************//
