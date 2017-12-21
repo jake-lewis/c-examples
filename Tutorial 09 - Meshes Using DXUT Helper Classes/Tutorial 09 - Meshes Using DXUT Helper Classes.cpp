@@ -52,7 +52,12 @@
 #include "SDKMesh.h"
 #include <xnamath.h>
 #include "resource.h"
-
+#include <fstream>
+#include <vector>
+#include <sstream>
+#include <algorithm>
+#include <functional>
+#include <cctype>
 
 
 //**************************************************************************//
@@ -169,13 +174,33 @@ struct CB_PS_PER_FRAME
     XMVECTOR m_vLightDirAmbient;	// Vector pointing at the light
 };
 
-
-struct MexhVertexStructure
+struct VertexXY
 {
-	XMFLOAT4 pos;
-	XMFLOAT3 normal;
-	XMFLOAT2 TextureUV;
+	float x, y;
 };
+
+struct VertexXYZ
+{
+	float x, y, z;
+};
+
+struct SimpleVertex
+{
+	XMFLOAT3 Pos;
+	XMFLOAT3 VecNormal;
+	XMFLOAT2 Tex;
+};
+
+struct BasicMesh
+{
+	SimpleVertex *vertices;
+	USHORT       *indexes;
+	USHORT       numVertices;
+	USHORT       numIndices;
+};
+
+
+BasicMesh					*g_MeshPig;
 
 UINT                        g_iCBPSPerFrameBind = 1;
 
@@ -242,8 +267,11 @@ void CALLBACK OnD3D11FrameRender( ID3D11Device* pd3dDevice, ID3D11DeviceContext*
 void InitApp();
 void RenderText();
 void charStrToWideChar(WCHAR *dest, char *source);
-void RenderMesh (ID3D11DeviceContext* pd3dImmediateContext, CDXUTSDKMesh *toRender);
-void RenderMesh(ID3D11DeviceContext* pd3dImmediateContext, CDXUTSDKMesh *toRender, ID3D11PixelShader *pixelShader);
+void RenderMeshDXUT (ID3D11DeviceContext* pd3dImmediateContext, CDXUTSDKMesh *toRender);
+void RenderMeshDXUT(ID3D11DeviceContext* pd3dImmediateContext, CDXUTSDKMesh *toRender, ID3D11PixelShader *pixelShader);
+BasicMesh *LoadMesh(ID3D11Device *pd3dDevice, ID3D11DeviceContext *pImmediateContext, LPSTR filename);
+void ParseMtlFile(ID3D11Device *pd3dDevice, ID3D11DeviceContext *pImmediateContext, WCHAR *mtlPath, WCHAR *parentPath);
+std::wstring TrimStart(std::wstring s);
 
 
 
@@ -666,6 +694,7 @@ HRESULT CALLBACK OnD3D11CreateDevice( ID3D11Device* pd3dDevice, const DXGI_SURFA
 	V_RETURN(g_MeshFloorTile.Create(pd3dDevice, L"Media\\floor\\seafloor.sdkmesh", true));
 	V_RETURN(g_MeshCloudBox.Create(pd3dDevice, L"Media\\cloudbox\\skysphere.sdkmesh", true));
 
+	g_MeshPig = LoadMesh(pd3dDevice, pd3dImmediateContext, "Media\\pig\\pig.obj");
 
 	// Create a sampler state
     D3D11_SAMPLER_DESC SamDesc;
@@ -902,35 +931,35 @@ void CALLBACK OnD3D11FrameRender( ID3D11Device* pd3dDevice, ID3D11DeviceContext*
 	//**************************************************************************//
 	// Render the mesh.															//
 	//**************************************************************************//
-	RenderMesh (pd3dImmediateContext, &g_MeshTiger);
+	RenderMeshDXUT (pd3dImmediateContext, &g_MeshTiger);
 	
 	CBMatrices.matWorld = XMMatrixTranspose(matWingLHWorld);
 	CBMatrices.matWorldViewProj = XMMatrixTranspose(matWingLHWorldViewProjection);
 	pd3dImmediateContext->UpdateSubresource(g_pcbVSPerObject, 0, NULL, &CBMatrices, 0, 0);
 	pd3dImmediateContext->VSSetConstantBuffers(0, 1, &g_pcbVSPerObject); 
 
-	RenderMesh(pd3dImmediateContext, &g_MeshWingLH);
+	RenderMeshDXUT(pd3dImmediateContext, &g_MeshWingLH);
 
 	CBMatrices.matWorld = XMMatrixTranspose(matWingWorldRH);
 	CBMatrices.matWorldViewProj = XMMatrixTranspose(matWingRHWorldViewProjection);
 	pd3dImmediateContext->UpdateSubresource(g_pcbVSPerObject, 0, NULL, &CBMatrices, 0, 0);
 	pd3dImmediateContext->VSSetConstantBuffers(0, 1, &g_pcbVSPerObject);
 
-	RenderMesh(pd3dImmediateContext, &g_MeshWingRH);
+	RenderMeshDXUT(pd3dImmediateContext, &g_MeshWingRH);
     
 	CBMatrices.matWorld = XMMatrixTranspose(matFloorWorld);
 	CBMatrices.matWorldViewProj = XMMatrixTranspose(matFloorWorldViewProjection);
 	pd3dImmediateContext->UpdateSubresource(g_pcbVSPerObject, 0, NULL, &CBMatrices, 0, 0);
 	pd3dImmediateContext->VSSetConstantBuffers(0, 1, &g_pcbVSPerObject);
 
-	RenderMesh(pd3dImmediateContext, &g_MeshFloorTile);
+	RenderMeshDXUT(pd3dImmediateContext, &g_MeshFloorTile);
 
 	CBMatrices.matWorld = XMMatrixTranspose(matSkyboxWorld);
 	CBMatrices.matWorldViewProj = XMMatrixTranspose(matSkyboxWorldViewProjection);
 	pd3dImmediateContext->UpdateSubresource(g_pcbVSPerObject, 0, NULL, &CBMatrices, 0, 0);
 	pd3dImmediateContext->VSSetConstantBuffers(0, 1, &g_pcbVSPerObject);
 
-	RenderMesh(pd3dImmediateContext, &g_MeshCloudBox, g_pPixelShaderNoLighting);
+	RenderMeshDXUT(pd3dImmediateContext, &g_MeshCloudBox, g_pPixelShaderNoLighting);
 	
 	//**************************************************************************//
 	// Render what is rather grandly called the head up display.				//
@@ -943,10 +972,10 @@ void CALLBACK OnD3D11FrameRender( ID3D11Device* pd3dDevice, ID3D11DeviceContext*
 }
 
 //Render a mesh using the default Pixel Shader
-void RenderMesh(ID3D11DeviceContext *pContext,
+void RenderMeshDXUT(ID3D11DeviceContext *pContext,
 				CDXUTSDKMesh         *toRender)
 {
-	RenderMesh(pContext, toRender, g_pPixelShader);
+	RenderMeshDXUT(pContext, toRender, g_pPixelShader);
 }
 
 
@@ -954,7 +983,7 @@ void RenderMesh(ID3D11DeviceContext *pContext,
 // Overloaded: Render a CDXUTSDKMesh, using the Device Context specified	//
 //and specific Pixel Shader.												//
 //**************************************************************************//
-void RenderMesh (ID3D11DeviceContext *pContext, 
+void RenderMeshDXUT (ID3D11DeviceContext *pContext, 
 				 CDXUTSDKMesh         *toRender,
 				 ID3D11PixelShader	*pixelShader)
 {
@@ -998,6 +1027,336 @@ void RenderMesh (ID3D11DeviceContext *pContext,
 
 }
 
+HRESULT RenderMeshOBJ(ID3D11Device *pd3dDevice, ID3D11DeviceContext *pContext, BasicMesh *mesh)
+{
+	//Set IAInputLayout
+	pContext->IASetInputLayout(g_pVertexLayout11);
+
+	//**************************************************************************//
+	// Create the vertex buffer.												//
+	//**************************************************************************//
+	D3D11_BUFFER_DESC bd;
+	ZeroMemory(&bd, sizeof(bd));
+	bd.Usage = D3D11_USAGE_DEFAULT;
+	bd.ByteWidth = sizeof(SimpleVertex) * mesh->numVertices;	//From BasicMesh
+	bd.BindFlags = D3D11_BIND_VERTEX_BUFFER;
+	bd.CPUAccessFlags = 0;
+	D3D11_SUBRESOURCE_DATA InitData;
+	ZeroMemory(&InitData, sizeof(InitData));
+	InitData.pSysMem = mesh->vertices;						//From BasicMesh
+
+	HRESULT hr = pd3dDevice->CreateBuffer(&bd, &InitData, &g_pVertexBuffer);
+	if (FAILED(hr))
+		return hr;
+
+	// Set vertex buffer
+	UINT stride = sizeof(SimpleVertex);
+	UINT offset = 0;
+	pContext->IASetVertexBuffers(0, 1, &g_pVertexBuffer, &stride, &offset);
+
+	//**************************************************************************//
+	// Now define some triangles.  That's all DirectX allows us to draw.  This  //
+	// is called an index buffer, and it indexes the vertices to make triangles.//
+	//																			//
+	// This is called an index buffer.											//
+	//**************************************************************************//
+
+	bd.Usage = D3D11_USAGE_DEFAULT;
+	bd.ByteWidth = sizeof(USHORT) * mesh->numIndices;   //From sortOfMesh
+
+	bd.BindFlags = D3D11_BIND_INDEX_BUFFER;
+	bd.CPUAccessFlags = 0;
+	InitData.pSysMem = mesh->indexes;					//From sortOfMesh
+
+	hr = pd3dDevice->CreateBuffer(&bd, &InitData, &g_pIndexBuffer);
+	if (FAILED(hr))
+		return hr;
+}
+
+BasicMesh *LoadMesh(ID3D11Device *pd3dDevice, ID3D11DeviceContext *pImmediateContext, LPSTR objFilePath)
+{
+	std::wifstream          fileStream;
+	std::wstring            line;
+	std::vector <VertexXYZ> vectorVertices(0);
+	std::vector <VertexXY> vectorTextureVertices(0);
+	std::vector <VertexXYZ> vectorNormal(0);
+	std::vector <USHORT>    vertexIndices(0);
+	std::vector <USHORT>	normalIndices(0);
+	std::vector <USHORT>	textureIndices(0);
+
+	fileStream.open(objFilePath);
+	bool isOpen = fileStream.is_open();		//debugging only.
+
+
+	while (std::getline(fileStream, line))
+	{
+		line = TrimStart(line);
+
+		//Get name of .mtl file
+		if (line.compare(0, 7, L"mtllib ") == 0)
+		{
+			WCHAR first[7];
+			WCHAR mtlFileName[200];
+
+			WCHAR oldStyleStr[200];
+			wcscpy(oldStyleStr, line.c_str());
+			swscanf(oldStyleStr, L"%6s%s", first, mtlFileName);
+
+			//Get length of the obj file path
+			int objFilePathLength = strlen(objFilePath);
+
+			//get length of obj file name
+			int fileNameLength = 0;
+			for (int i = objFilePathLength - 1; i >= 0; i--)
+			{
+				if (objFilePath[i] == '\\')
+				{
+					fileNameLength = objFilePathLength - (i + 1);
+					break;
+				}
+			}
+
+			//Get the path to parent folder of the obj file
+			WCHAR objParentPath[200];
+
+			for (int i = 0; i < 200; i++)
+			{
+				if (i < objFilePathLength - fileNameLength)
+				{
+					objParentPath[i] = objFilePath[i];
+				}
+				else
+				{
+					objParentPath[i] = NULL;
+					break;
+				}
+
+			}
+
+			//Parse .mtl file
+			WCHAR mtlFullPath[200];
+			wcscpy(mtlFullPath, objParentPath);
+			wcscat(mtlFullPath, mtlFileName);
+			ParseMtlFile(pd3dDevice, pImmediateContext, mtlFullPath, objParentPath);
+		}
+
+		//******************************************************************//
+		// If true, we have found a vertex.  Read it in as a 2 character	//
+		// string, followed by 3 decimal numbers.	Suprisingly the C++		//
+		// string has no split() method.   I am using really old stuff,		//
+		// fscanf.  There  must be a better way, use regular expressions?	//
+		//******************************************************************//
+		if (line.compare(0, 2, L"v ") == 0)  //"v space"
+		{
+			WCHAR first[5];
+			float x, y, z;
+
+			WCHAR oldStyleStr[200];
+			wcscpy(oldStyleStr, line.c_str());
+			swscanf(oldStyleStr, L"%2s%f%f%f", first, &x, &y, &z);
+
+			VertexXYZ v;
+			v.x = x; v.y = y; v.z = z;
+			vectorVertices.push_back(v);
+		}
+
+		//Vertex textures
+		if (line.compare(0, 3, L"vt ") == 0)  //"vt space"
+		{
+			WCHAR first[5];
+			float x, y;
+
+			WCHAR oldStyleStr[200];
+			wcscpy(oldStyleStr, line.c_str());
+			swscanf(oldStyleStr, L"%2s%f%f%f", first, &x, &y);
+
+			VertexXY v;
+			v.x = x; v.y = y;
+			vectorTextureVertices.push_back(v);
+		}
+
+		//Vector Normal
+		if (line.compare(0, 3, L"vn ") == 0)  //"vn space"
+		{
+			WCHAR first[5];
+			float x, y, z;
+
+			WCHAR oldStyleStr[200];
+			wcscpy(oldStyleStr, line.c_str());
+			swscanf(oldStyleStr, L"%2s%f%f%f", first, &x, &y, &z);
+
+			VertexXYZ v;
+			v.x = x; v.y = y; v.z = z;
+			vectorNormal.push_back(v);
+		}
+
+		//******************************************************************//
+		// If true, we have found a face.   Read it in as a 2 character		//
+		// string, followed by 3 decimal numbers.	Suprisingly the C++		//
+		// string has no split() method.   I am using really old stuff,		//
+		// fscanf.  There must be a better way, use regular expressions?	//
+		//																	//
+		// It assumes the line is in the format								//
+		// f v1/vt1/vn1 v2/vt2/vn2 v3/vt3/vn3 ...							//
+		//******************************************************************// 
+		if (line.compare(0, 2, L"f ") == 0)  //"f space"
+		{
+			WCHAR first[5];
+			WCHAR slash1[5];
+			WCHAR slash2[5];
+			WCHAR slash3[5];
+			WCHAR slash4[5];
+			WCHAR slash5[5];
+			WCHAR slash6[5];
+
+			UINT v1, vt1, vn1, v2, vt2, vn2, v3, vt3, vn3;
+
+			WCHAR oldStyleStr[200];
+			wcscpy(oldStyleStr, line.c_str());
+			swscanf(oldStyleStr, L"%2s%d%1s%d%1s%d%d%1s%d%1s%d%d%1s%d%1s%d", first,
+				&v1, slash1, &vt1, slash2, &vn1,
+				&v2, slash3, &vt2, slash4, &vn2,
+				&v3, slash5, &vt3, slash6, &vn3);
+
+			vertexIndices.push_back(v1 - 1);	// Check this carefully; see below
+			vertexIndices.push_back(v2 - 1);
+			vertexIndices.push_back(v3 - 1);
+			normalIndices.push_back(vn1 - 1);
+			normalIndices.push_back(vn2 - 1);
+			normalIndices.push_back(vn3 - 1);
+			textureIndices.push_back(vt1 - 1);
+			textureIndices.push_back(vt2 - 1);
+			textureIndices.push_back(vt3 - 1);
+		}
+	}
+
+
+
+	//******************************************************************//
+	// Now build up the arrays.											//
+	//																	// 
+	// Nigel to address this bit; it is WRONG.  OBJ meshes assume index //
+	// numbers start from 1; C arrays have indexes that start at 0.		//
+	//																	//
+	// See abobe wih the -1s.  Sorted?									//
+	//******************************************************************//
+	BasicMesh *mesh = new BasicMesh;
+
+
+
+	mesh->numVertices = (USHORT)vectorVertices.size();
+	mesh->vertices = new SimpleVertex[mesh->numVertices];
+	for (int i = 0; i < mesh->numVertices; i++)
+	{
+		mesh->vertices[i].Pos.x = vectorVertices[i].x;
+		mesh->vertices[i].Pos.y = vectorVertices[i].y;
+		mesh->vertices[i].Pos.z = vectorVertices[i].z;
+	}
+
+	mesh->numIndices = (USHORT)vertexIndices.size();
+	mesh->indexes = new USHORT[mesh->numIndices];
+
+	using namespace std;
+	ofstream outFile;
+	outFile.open("debugOutput.txt");
+
+	for (int i = 0; i < mesh->numIndices; i++)
+	{
+		mesh->indexes[i] = vertexIndices[i];
+
+		//Set normals and textures of indexed vertices according to their respective indices
+		mesh->vertices[mesh->indexes[i]].VecNormal.x = vectorNormal[normalIndices[i]].x;
+		mesh->vertices[mesh->indexes[i]].VecNormal.y = vectorNormal[normalIndices[i]].y;
+		mesh->vertices[mesh->indexes[i]].VecNormal.z = vectorNormal[normalIndices[i]].z;
+		mesh->vertices[mesh->indexes[i]].Tex.x = vectorTextureVertices[textureIndices[i]].x;
+		mesh->vertices[mesh->indexes[i]].Tex.y = vectorTextureVertices[textureIndices[i]].y;
+
+	}
+
+	for (int i = 0; i < vectorVertices.size(); i++)
+	{
+		outFile << "v " << vectorVertices[i].x << " " << vectorVertices[i].y << " " << vectorVertices[i].z << "\n";
+	}
+
+	for (int i = 0; i < vectorTextureVertices.size(); i++)
+	{
+		outFile << "vt " << vectorTextureVertices[i].x << " " << vectorTextureVertices[i].y << "\n";
+	}
+
+	for (int i = 0; i < vectorNormal.size(); i++)
+	{
+		outFile << "vn " << vectorNormal[i].x << " " << vectorNormal[i].y << " " << vectorNormal[i].z << "\n";
+	}
+
+	for (int i = 0; i < mesh->numIndices; i = i + 3)
+	{
+		outFile << "f " << mesh->indexes[i] + 1 << "/" << textureIndices[i] + 1 << "/" << normalIndices[i] + 1 << " " << mesh->indexes[i + 1] + 1 << "/" << textureIndices[i + 1] + 1 << "/" << normalIndices[i + 1] + 1 << " " << mesh->indexes[i + 2] + 1 << "/" << textureIndices[i + 2] + 1 << "/" << normalIndices[i + 2] + 1 << "\n";
+	}
+
+	outFile.close();
+
+	//Close filestream, not sure if this was supposed to be left open?
+	fileStream.close();
+
+	return mesh;
+}
+
+void ParseMtlFile(ID3D11Device *pd3dDevice, ID3D11DeviceContext *pImmediateContext, WCHAR *mtlPath, WCHAR *parentPath)
+{
+	std::wifstream          fileStream;
+	std::wstring            line;
+
+	fileStream.open(mtlPath);
+
+
+	while (std::getline(fileStream, line))
+	{
+		line = TrimStart(line);
+
+		if (line.compare(0, 7, L"newmtl ") == 0)
+		{
+			WCHAR first[7];
+			WCHAR mtlName[50];
+
+			WCHAR oldStyleStr[57];
+			wcscpy(oldStyleStr, line.c_str());
+			swscanf(oldStyleStr, L"%6s%s", first, mtlName);
+		}
+
+		if (line.compare(0, 7, L"map_Kd ") == 0)
+		{
+			WCHAR first[7];
+			WCHAR texture[50];
+
+			WCHAR oldStyleStr[57];
+			wcscpy(oldStyleStr, line.c_str());
+			swscanf(oldStyleStr, L"%6s%s", first, texture);
+
+			WCHAR texturePath[200];
+			wcscpy(texturePath, parentPath);
+			wcscat(texturePath, texture);
+
+			//TODO check if this works here and not as global
+			ID3D11ShaderResourceView *textureResourceView = nullptr;
+
+			HRESULT hr = D3DX11CreateShaderResourceViewFromFile(pd3dDevice,
+				texturePath,
+				NULL, NULL,
+				&textureResourceView,		// This is returned.
+				NULL);
+
+			if (hr == S_OK)
+			{
+				//TODO add shader resource to mesh local value
+				//pImmediateContext->PSSetShaderResources(0, 1, &textureResourceView);
+				textureResourceView->Release();
+			}
+		}
+	}
+
+	fileStream.close();
+}
+
 
 
 //--------------------------------------------------------------------------------------
@@ -1024,6 +1383,10 @@ void CALLBACK OnD3D11DestroyDevice( void* pUserContext )
 	g_MeshWingRH.Destroy();
 	g_MeshFloorTile.Destroy();
 	g_MeshCloudBox.Destroy();
+
+	delete g_MeshPig->indexes;
+	delete g_MeshPig->vertices;
+	delete g_MeshPig;
                 
     SAFE_RELEASE( g_pVertexLayout11 );
     SAFE_RELEASE( g_pVertexBuffer );
@@ -1051,4 +1414,11 @@ void charStrToWideChar(WCHAR *dest, char *source)
 	int length = strlen(source);
 	for (int i = 0; i <= length; i++)
 		dest[i] = (WCHAR) source[i];
+}
+
+std::wstring TrimStart(std::wstring s)
+{
+	s.erase(s.begin(), std::find_if(s.begin(),
+		s.end(), std::not1(std::ptr_fun<int, int>(std::isspace))));
+	return s;
 }
