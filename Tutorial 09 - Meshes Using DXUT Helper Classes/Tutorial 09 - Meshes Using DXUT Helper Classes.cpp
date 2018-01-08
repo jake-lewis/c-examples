@@ -127,6 +127,20 @@ struct TIGER
 
 TIGER g_Tiger;
 
+struct PIG
+{
+	float x;
+	float y;
+	float z;
+
+	PIG() :
+		x(0),
+		y(0),
+		z(0) {}
+};
+
+PIG g_Pig;
+
 bool		 g_b_LeftArrowDown      = false;	//Status of keyboard.  Thess are set
 bool		 g_b_RightArrowDown     = false;	//in the callback KeyboardProc(), and 
 bool		 g_b_UpArrowDown	    = false;	//are used in onFrameMove().
@@ -197,6 +211,7 @@ struct BasicMesh
 	USHORT       *indexes;
 	USHORT       numVertices;
 	USHORT       numIndices;
+	ID3D11ShaderResourceView *textureResourceView;
 };
 
 
@@ -269,8 +284,10 @@ void RenderText();
 void charStrToWideChar(WCHAR *dest, char *source);
 void RenderMeshDXUT (ID3D11DeviceContext* pd3dImmediateContext, CDXUTSDKMesh *toRender);
 void RenderMeshDXUT(ID3D11DeviceContext* pd3dImmediateContext, CDXUTSDKMesh *toRender, ID3D11PixelShader *pixelShader);
+HRESULT RenderMeshOBJ(ID3D11Device *pd3dDevice, ID3D11DeviceContext *pContext, BasicMesh *mesh);
+HRESULT RenderMeshOBJ(ID3D11Device *pd3dDevice, ID3D11DeviceContext *pContext, BasicMesh *mesh, ID3D11PixelShader *pixelShader);
 BasicMesh *LoadMesh(ID3D11Device *pd3dDevice, ID3D11DeviceContext *pImmediateContext, LPSTR filename);
-void ParseMtlFile(ID3D11Device *pd3dDevice, ID3D11DeviceContext *pImmediateContext, WCHAR *mtlPath, WCHAR *parentPath);
+HRESULT ParseMtlFile(ID3D11Device *pd3dDevice, ID3D11DeviceContext *pImmediateContext, WCHAR *mtlPath, WCHAR *parentPath, BasicMesh *mesh);
 std::wstring TrimStart(std::wstring s);
 
 
@@ -881,6 +898,13 @@ void CALLBACK OnD3D11FrameRender( ID3D11Device* pd3dDevice, ID3D11DeviceContext*
 
 	XMMATRIX matSkyboxWorldViewProjection = matSkyboxWorld * matView * g_MatProjection;
 
+	//Pig
+	XMMATRIX matPigTranslate = XMMatrixTranslation(g_Pig.x, g_Pig.y, g_Pig.z);
+	XMMATRIX matPigScale = XMMatrixScaling(1, 1, 1);
+	XMMATRIX matPigWorld = matPigTranslate * matPigScale;
+
+	XMMATRIX matPigWorldViewProjection = matPigWorld * matView * g_MatProjection;
+
 	//******************************************************************//
 	// Lighting.  Ambient light and a light direction, above, to the	//
 	// left and two paces back, I think.  Then normalise the light		//
@@ -953,6 +977,15 @@ void CALLBACK OnD3D11FrameRender( ID3D11Device* pd3dDevice, ID3D11DeviceContext*
 	pd3dImmediateContext->VSSetConstantBuffers(0, 1, &g_pcbVSPerObject);
 
 	RenderMeshDXUT(pd3dImmediateContext, &g_MeshFloorTile);
+
+	//TODO Fix OBJ Implementation
+
+	CBMatrices.matWorld = XMMatrixTranspose(matPigWorld);
+	CBMatrices.matWorldViewProj = XMMatrixTranspose(matPigWorldViewProjection);
+	pd3dImmediateContext->UpdateSubresource(g_pcbVSPerObject, 0, NULL, &CBMatrices, 0, 0);
+	pd3dImmediateContext->VSSetConstantBuffers(0, 1, &g_pcbVSPerObject);
+
+	RenderMeshOBJ(pd3dDevice, pd3dImmediateContext, g_MeshPig);
 
 	CBMatrices.matWorld = XMMatrixTranspose(matSkyboxWorld);
 	CBMatrices.matWorldViewProj = XMMatrixTranspose(matSkyboxWorldViewProjection);
@@ -1029,6 +1062,11 @@ void RenderMeshDXUT (ID3D11DeviceContext *pContext,
 
 HRESULT RenderMeshOBJ(ID3D11Device *pd3dDevice, ID3D11DeviceContext *pContext, BasicMesh *mesh)
 {
+	return RenderMeshOBJ(pd3dDevice, pContext, mesh, g_pPixelShader);
+}
+
+HRESULT RenderMeshOBJ(ID3D11Device *pd3dDevice, ID3D11DeviceContext *pContext, BasicMesh *mesh, ID3D11PixelShader *pixelShader)
+{
 	//Set IAInputLayout
 	pContext->IASetInputLayout(g_pVertexLayout11);
 
@@ -1071,6 +1109,20 @@ HRESULT RenderMeshOBJ(ID3D11Device *pd3dDevice, ID3D11DeviceContext *pContext, B
 	hr = pd3dDevice->CreateBuffer(&bd, &InitData, &g_pIndexBuffer);
 	if (FAILED(hr))
 		return hr;
+
+	// Set index buffer
+	pContext->IASetIndexBuffer(g_pIndexBuffer, DXGI_FORMAT_R16_UINT, 0);
+
+	// Set the shaders
+	pContext->VSSetShader(g_pVertexShader, NULL, 0);
+	pContext->PSSetShader(pixelShader, NULL, 0);
+
+	pContext->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+
+	ID3D11ShaderResourceView* pDiffuseRV = mesh->textureResourceView;
+	pContext->PSSetShaderResources(0, 1, &pDiffuseRV);
+
+	pContext->DrawIndexed(mesh->numIndices, 0, 0);
 }
 
 BasicMesh *LoadMesh(ID3D11Device *pd3dDevice, ID3D11DeviceContext *pImmediateContext, LPSTR objFilePath)
@@ -1083,6 +1135,9 @@ BasicMesh *LoadMesh(ID3D11Device *pd3dDevice, ID3D11DeviceContext *pImmediateCon
 	std::vector <USHORT>    vertexIndices(0);
 	std::vector <USHORT>	normalIndices(0);
 	std::vector <USHORT>	textureIndices(0);
+	ID3D11ShaderResourceView *textureResourceView = nullptr;
+
+	BasicMesh *mesh = new BasicMesh;
 
 	fileStream.open(objFilePath);
 	bool isOpen = fileStream.is_open();		//debugging only.
@@ -1137,7 +1192,8 @@ BasicMesh *LoadMesh(ID3D11Device *pd3dDevice, ID3D11DeviceContext *pImmediateCon
 			WCHAR mtlFullPath[200];
 			wcscpy(mtlFullPath, objParentPath);
 			wcscat(mtlFullPath, mtlFileName);
-			ParseMtlFile(pd3dDevice, pImmediateContext, mtlFullPath, objParentPath);
+
+			HRESULT hr = ParseMtlFile(pd3dDevice, pImmediateContext, mtlFullPath, objParentPath, mesh);
 		}
 
 		//******************************************************************//
@@ -1240,10 +1296,8 @@ BasicMesh *LoadMesh(ID3D11Device *pd3dDevice, ID3D11DeviceContext *pImmediateCon
 	//																	//
 	// See abobe wih the -1s.  Sorted?									//
 	//******************************************************************//
-	BasicMesh *mesh = new BasicMesh;
 
-
-
+	//mesh->textureResourceView = textureResourceView;
 	mesh->numVertices = (USHORT)vectorVertices.size();
 	mesh->vertices = new SimpleVertex[mesh->numVertices];
 	for (int i = 0; i < mesh->numVertices; i++)
@@ -1301,10 +1355,12 @@ BasicMesh *LoadMesh(ID3D11Device *pd3dDevice, ID3D11DeviceContext *pImmediateCon
 	return mesh;
 }
 
-void ParseMtlFile(ID3D11Device *pd3dDevice, ID3D11DeviceContext *pImmediateContext, WCHAR *mtlPath, WCHAR *parentPath)
+HRESULT ParseMtlFile(ID3D11Device *pd3dDevice, ID3D11DeviceContext *pImmediateContext, WCHAR *mtlPath, WCHAR *parentPath, BasicMesh *mesh)
 {
 	std::wifstream          fileStream;
 	std::wstring            line;
+
+	HRESULT hr = S_FALSE;
 
 	fileStream.open(mtlPath);
 
@@ -1339,7 +1395,7 @@ void ParseMtlFile(ID3D11Device *pd3dDevice, ID3D11DeviceContext *pImmediateConte
 			//TODO check if this works here and not as global
 			ID3D11ShaderResourceView *textureResourceView = nullptr;
 
-			HRESULT hr = D3DX11CreateShaderResourceViewFromFile(pd3dDevice,
+			hr = D3DX11CreateShaderResourceViewFromFile(pd3dDevice,
 				texturePath,
 				NULL, NULL,
 				&textureResourceView,		// This is returned.
@@ -1347,14 +1403,14 @@ void ParseMtlFile(ID3D11Device *pd3dDevice, ID3D11DeviceContext *pImmediateConte
 
 			if (hr == S_OK)
 			{
-				//TODO add shader resource to mesh local value
-				//pImmediateContext->PSSetShaderResources(0, 1, &textureResourceView);
-				textureResourceView->Release();
+				mesh->textureResourceView = textureResourceView;
 			}
 		}
 	}
 
 	fileStream.close();
+
+	return hr;
 }
 
 
@@ -1386,6 +1442,7 @@ void CALLBACK OnD3D11DestroyDevice( void* pUserContext )
 
 	delete g_MeshPig->indexes;
 	delete g_MeshPig->vertices;
+	g_MeshPig->textureResourceView->Release();
 	delete g_MeshPig;
                 
     SAFE_RELEASE( g_pVertexLayout11 );
