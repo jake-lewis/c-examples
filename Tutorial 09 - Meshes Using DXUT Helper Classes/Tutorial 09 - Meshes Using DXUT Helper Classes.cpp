@@ -129,19 +129,19 @@ struct TIGER
 
 TIGER g_Tiger;
 
-struct PIG
+struct OBJ
 {
 	float x;
 	float y;
 	float z;
 
-	PIG() :
-		x(0),
-		y(-1),
-		z(0) {}
+	OBJ() : x(0), y(0), z(0) {}
+	OBJ(float xIn, float yIn, float zIn) : x(xIn), y(yIn), z(zIn) {}
+
 };
 
-PIG g_Pig;
+OBJ g_Pig(0.0, -1.0, 0.0);
+OBJ g_Wall;
 
 bool		 g_b_LeftArrowDown      = false;	//Status of keyboard.  Thess are set
 bool		 g_b_RightArrowDown     = false;	//in the callback KeyboardProc(), and 
@@ -218,6 +218,7 @@ struct BasicMesh
 
 
 BasicMesh					*g_MeshPig;
+BasicMesh					*g_SciFiWall;
 
 UINT                        g_iCBPSPerFrameBind = 1;
 
