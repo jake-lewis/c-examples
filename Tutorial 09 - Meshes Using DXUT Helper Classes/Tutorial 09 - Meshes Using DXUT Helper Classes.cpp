@@ -94,6 +94,8 @@ XMMATRIX					g_MatProjection;
 ID3D11InputLayout          *g_pVertexLayout11 = NULL;
 ID3D11Buffer               *g_pVertexBuffer   = NULL;
 ID3D11Buffer               *g_pIndexBuffer    = NULL;
+ID3D11Buffer               *g_pVertexBufferOBJ = NULL;
+ID3D11Buffer               *g_pIndexBufferOBJ = NULL;
 ID3D11VertexShader         *g_pVertexShader   = NULL;
 ID3D11PixelShader          *g_pPixelShader    = NULL;
 ID3D11PixelShader		   *g_pPixelShaderNoLighting = NULL;
@@ -284,8 +286,8 @@ void RenderText();
 void charStrToWideChar(WCHAR *dest, char *source);
 void RenderMeshDXUT (ID3D11DeviceContext* pd3dImmediateContext, CDXUTSDKMesh *toRender);
 void RenderMeshDXUT(ID3D11DeviceContext* pd3dImmediateContext, CDXUTSDKMesh *toRender, ID3D11PixelShader *pixelShader);
-HRESULT RenderMeshOBJ(ID3D11Device *pd3dDevice, ID3D11DeviceContext *pContext, BasicMesh *mesh);
-HRESULT RenderMeshOBJ(ID3D11Device *pd3dDevice, ID3D11DeviceContext *pContext, BasicMesh *mesh, ID3D11PixelShader *pixelShader);
+void RenderMeshOBJ(ID3D11Device *pd3dDevice, ID3D11DeviceContext *pContext, BasicMesh *mesh);
+void RenderMeshOBJ(ID3D11Device *pd3dDevice, ID3D11DeviceContext *pContext, BasicMesh *mesh, ID3D11PixelShader *pixelShader);
 BasicMesh *LoadMesh(ID3D11Device *pd3dDevice, ID3D11DeviceContext *pImmediateContext, LPSTR filename);
 HRESULT ParseMtlFile(ID3D11Device *pd3dDevice, ID3D11DeviceContext *pImmediateContext, WCHAR *mtlPath, WCHAR *parentPath, BasicMesh *mesh);
 std::wstring TrimStart(std::wstring s);
@@ -713,6 +715,50 @@ HRESULT CALLBACK OnD3D11CreateDevice( ID3D11Device* pd3dDevice, const DXGI_SURFA
 
 	g_MeshPig = LoadMesh(pd3dDevice, pd3dImmediateContext, "Media\\pig\\pig.obj");
 
+	//START OF PIG BUFFER SETUP
+
+	//**************************************************************************//
+	// Create the vertex buffer.												//
+	//**************************************************************************//
+	D3D11_BUFFER_DESC bd;
+	ZeroMemory(&bd, sizeof(bd));
+	bd.Usage = D3D11_USAGE_DEFAULT;
+	bd.ByteWidth = sizeof(SimpleVertex) * g_MeshPig->numVertices;	//From BasicMesh
+	bd.BindFlags = D3D11_BIND_VERTEX_BUFFER;
+	bd.CPUAccessFlags = 0;
+	D3D11_SUBRESOURCE_DATA InitData;
+	ZeroMemory(&InitData, sizeof(InitData));
+	InitData.pSysMem = g_MeshPig->vertices;						//From BasicMesh
+
+	hr = pd3dDevice->CreateBuffer(&bd, &InitData, &g_pVertexBufferOBJ);
+	if (FAILED(hr))
+		return hr;
+
+	// Set vertex buffer
+	UINT stride = sizeof(SimpleVertex);
+	UINT offset = 0;
+	pd3dImmediateContext->IASetVertexBuffers(0, 1, &g_pVertexBufferOBJ, &stride, &offset);
+
+	//**************************************************************************//
+	// Now define some triangles.  That's all DirectX allows us to draw.  This  //
+	// is called an index buffer, and it indexes the vertices to make triangles.//
+	//																			//
+	// This is called an index buffer.											//
+	//**************************************************************************//
+
+	bd.Usage = D3D11_USAGE_DEFAULT;
+	bd.ByteWidth = sizeof(USHORT) * g_MeshPig->numIndices;   //From sortOfMesh
+
+	bd.BindFlags = D3D11_BIND_INDEX_BUFFER;
+	bd.CPUAccessFlags = 0;
+	InitData.pSysMem = g_MeshPig->indexes;					//From sortOfMesh
+
+	hr = pd3dDevice->CreateBuffer(&bd, &InitData, &g_pIndexBufferOBJ);
+	if (FAILED(hr))
+		return hr;
+
+	// END OF PIG BUFFER SETUP
+
 	// Create a sampler state
     D3D11_SAMPLER_DESC SamDesc;
     SamDesc.Filter = D3D11_FILTER_MIN_MAG_MIP_LINEAR;
@@ -1060,58 +1106,23 @@ void RenderMeshDXUT (ID3D11DeviceContext *pContext,
 
 }
 
-HRESULT RenderMeshOBJ(ID3D11Device *pd3dDevice, ID3D11DeviceContext *pContext, BasicMesh *mesh)
+void RenderMeshOBJ(ID3D11Device *pd3dDevice, ID3D11DeviceContext *pContext, BasicMesh *mesh)
 {
-	return RenderMeshOBJ(pd3dDevice, pContext, mesh, g_pPixelShader);
+	RenderMeshOBJ(pd3dDevice, pContext, mesh, g_pPixelShader);
 }
 
-HRESULT RenderMeshOBJ(ID3D11Device *pd3dDevice, ID3D11DeviceContext *pContext, BasicMesh *mesh, ID3D11PixelShader *pixelShader)
+void RenderMeshOBJ(ID3D11Device *pd3dDevice, ID3D11DeviceContext *pContext, BasicMesh *mesh, ID3D11PixelShader *pixelShader)
 {
 	//Set IAInputLayout
 	pContext->IASetInputLayout(g_pVertexLayout11);
 
-	//**************************************************************************//
-	// Create the vertex buffer.												//
-	//**************************************************************************//
-	D3D11_BUFFER_DESC bd;
-	ZeroMemory(&bd, sizeof(bd));
-	bd.Usage = D3D11_USAGE_DEFAULT;
-	bd.ByteWidth = sizeof(SimpleVertex) * mesh->numVertices;	//From BasicMesh
-	bd.BindFlags = D3D11_BIND_VERTEX_BUFFER;
-	bd.CPUAccessFlags = 0;
-	D3D11_SUBRESOURCE_DATA InitData;
-	ZeroMemory(&InitData, sizeof(InitData));
-	InitData.pSysMem = mesh->vertices;						//From BasicMesh
-
-	HRESULT hr = pd3dDevice->CreateBuffer(&bd, &InitData, &g_pVertexBuffer);
-	if (FAILED(hr))
-		return hr;
-
 	// Set vertex buffer
 	UINT stride = sizeof(SimpleVertex);
 	UINT offset = 0;
-	pContext->IASetVertexBuffers(0, 1, &g_pVertexBuffer, &stride, &offset);
-
-	//**************************************************************************//
-	// Now define some triangles.  That's all DirectX allows us to draw.  This  //
-	// is called an index buffer, and it indexes the vertices to make triangles.//
-	//																			//
-	// This is called an index buffer.											//
-	//**************************************************************************//
-
-	bd.Usage = D3D11_USAGE_DEFAULT;
-	bd.ByteWidth = sizeof(USHORT) * mesh->numIndices;   //From sortOfMesh
-
-	bd.BindFlags = D3D11_BIND_INDEX_BUFFER;
-	bd.CPUAccessFlags = 0;
-	InitData.pSysMem = mesh->indexes;					//From sortOfMesh
-
-	hr = pd3dDevice->CreateBuffer(&bd, &InitData, &g_pIndexBuffer);
-	if (FAILED(hr))
-		return hr;
+	pContext->IASetVertexBuffers(0, 1, &g_pVertexBufferOBJ, &stride, &offset);
 
 	// Set index buffer
-	pContext->IASetIndexBuffer(g_pIndexBuffer, DXGI_FORMAT_R16_UINT, 0);
+	pContext->IASetIndexBuffer(g_pIndexBufferOBJ, DXGI_FORMAT_R16_UINT, 0);
 
 	// Set the shaders
 	pContext->VSSetShader(g_pVertexShader, NULL, 0);
@@ -1448,6 +1459,8 @@ void CALLBACK OnD3D11DestroyDevice( void* pUserContext )
     SAFE_RELEASE( g_pVertexLayout11 );
     SAFE_RELEASE( g_pVertexBuffer );
     SAFE_RELEASE( g_pIndexBuffer );
+	SAFE_RELEASE(g_pVertexBufferOBJ);
+	SAFE_RELEASE(g_pIndexBufferOBJ);
     SAFE_RELEASE( g_pVertexShader );
     SAFE_RELEASE( g_pPixelShader );
 	SAFE_RELEASE(g_pPixelShaderNoLighting);
