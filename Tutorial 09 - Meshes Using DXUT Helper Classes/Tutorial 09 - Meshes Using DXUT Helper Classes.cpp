@@ -137,7 +137,7 @@ struct PIG
 
 	PIG() :
 		x(0),
-		y(0),
+		y(-1),
 		z(0) {}
 };
 
@@ -933,8 +933,9 @@ void CALLBACK OnD3D11FrameRender( ID3D11Device* pd3dDevice, ID3D11DeviceContext*
 	matWingRHWorldViewProjection = matWingWorldRH * matView * g_MatProjection;
 
 	//Floor
+	XMMATRIX matFloorTranslate = XMMatrixTranslation(0, 8, 0);
 	XMMATRIX matFloorScale = XMMatrixScaling(1, 1, 1);
-	XMMATRIX matFloorWorld = matFloorScale;
+	XMMATRIX matFloorWorld = matFloorTranslate * matFloorScale;
 
 	XMMATRIX matFloorWorldViewProjection = matFloorWorld * matView * g_MatProjection;
 
