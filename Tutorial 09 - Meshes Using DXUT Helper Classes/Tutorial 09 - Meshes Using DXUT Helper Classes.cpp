@@ -138,8 +138,7 @@ struct OBJ
 
 };
 
-OBJ g_Pig(0.0, -1.0, 0.0);
-OBJ g_Wall;
+OBJ g_Pig(2.0, -1.0, -1.0);
 
 bool		 g_b_LeftArrowDown      = false;	//Status of keyboard.  Thess are set
 bool		 g_b_RightArrowDown     = false;	//in the callback KeyboardProc(), and 
@@ -216,9 +215,22 @@ struct BasicMesh
 	ID3D11ShaderResourceView *textureResourceView;
 };
 
+struct PointLight {
+	PointLight() { ZeroMemory(this, sizeof(this)); }
+
+	XMFLOAT4 Ambient;
+	XMFLOAT4 Diffuse;
+	XMFLOAT4 Specular;
+
+	XMFLOAT3 Position;
+	float Range;
+
+	XMFLOAT3 Att;
+	float Pad;
+};
+
 
 BasicMesh					*g_MeshPig;
-BasicMesh					*g_SciFiWall;
 
 UINT                        g_iCBPSPerFrameBind = 1;
 
@@ -716,8 +728,6 @@ HRESULT CALLBACK OnD3D11CreateDevice( ID3D11Device* pd3dDevice, const DXGI_SURFA
 
 	g_MeshPig = LoadMesh(pd3dDevice, pd3dImmediateContext, "Media\\pig\\pig.obj");
 
-
-
 	// Create a sampler state
     D3D11_SAMPLER_DESC SamDesc;
     SamDesc.Filter = D3D11_FILTER_MIN_MAG_MIP_LINEAR;
@@ -911,13 +921,6 @@ void CALLBACK OnD3D11FrameRender( ID3D11Device* pd3dDevice, ID3D11DeviceContext*
 
 	XMMATRIX matPigWorldViewProjection = matPigWorld * matView * g_MatProjection;
 
-	//SciFi Wall
-	XMMATRIX matWallTranslate = XMMatrixTranslation(g_Wall.x, g_Wall.y, g_Wall.z);
-	XMMATRIX matWallScale = XMMatrixScaling(1, 1, 1);
-	XMMATRIX matWallWorld = matWallTranslate * matWallScale;
-
-	XMMATRIX matWallWorldViewProjection = matWallWorld * matView * g_MatProjection;
-
 	//******************************************************************//
 	// Lighting.  Ambient light and a light direction, above, to the	//
 	// left and two paces back, I think.  Then normalise the light		//
@@ -999,6 +1002,8 @@ void CALLBACK OnD3D11FrameRender( ID3D11Device* pd3dDevice, ID3D11DeviceContext*
 	pd3dImmediateContext->VSSetConstantBuffers(0, 1, &g_pcbVSPerObject);
 
 	RenderMeshOBJ(pd3dDevice, pd3dImmediateContext, g_MeshPig);
+
+	//Render this DXUT after OBJ because different pixel shader
 
 	CBMatrices.matWorld = XMMatrixTranspose(matSkyboxWorld);
 	CBMatrices.matWorldViewProj = XMMatrixTranspose(matSkyboxWorldViewProjection);
