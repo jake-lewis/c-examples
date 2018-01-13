@@ -140,6 +140,55 @@ struct OBJ
 
 OBJ g_Pig(2.0, -1.0, -1.0);
 
+struct Material {
+	XMFLOAT4 Ambient;
+	XMFLOAT4 Diffuse;
+	XMFLOAT4 Specular;
+	XMFLOAT4 Reflect;
+};
+
+struct DirectionalLight {
+	DirectionalLight() { ZeroMemory(this, sizeof(this)); }
+
+	XMFLOAT4 Ambient;
+	XMFLOAT4 Diffuse;
+	XMFLOAT4 Specular;
+	XMFLOAT3 Direction;
+	float pad;
+};
+
+struct PointLight {
+	PointLight() { ZeroMemory(this, sizeof(this)); }
+
+	XMFLOAT4 Ambient;
+	XMFLOAT4 Diffuse;
+	XMFLOAT4 Specular;
+
+	XMFLOAT3 Position;
+	float Range;
+
+	XMFLOAT3 Att;
+	float Pad;
+};
+
+struct SpotLight
+{
+	SpotLight() { ZeroMemory(this, sizeof(this)); }
+
+	XMFLOAT4 Ambient;
+	XMFLOAT4 Diffuse;
+	XMFLOAT4 Specular;
+
+	XMFLOAT3 Position;
+	float Range;
+
+	XMFLOAT3 Direction;
+	float Spot;
+
+	XMFLOAT3 Att;
+	float Pad;
+};
+
 bool		 g_b_LeftArrowDown      = false;	//Status of keyboard.  Thess are set
 bool		 g_b_RightArrowDown     = false;	//in the callback KeyboardProc(), and 
 bool		 g_b_UpArrowDown	    = false;	//are used in onFrameMove().
@@ -179,12 +228,18 @@ struct CB_VS_PER_OBJECT
 struct CB_PS_PER_OBJECT
 {
     XMFLOAT4 m_vObjectColor;
+	Material material;
 };
 UINT                        g_iCBPSPerObjectBind = 0;
 
 struct CB_PS_PER_FRAME
 {
     XMVECTOR m_vLightDirAmbient;	// Vector pointing at the light
+	//test stuff
+	DirectionalLight dirLight;
+	PointLight pointLight;
+	SpotLight spotLight;
+	XMFLOAT3 eyePos;
 };
 
 struct VertexXY
@@ -212,25 +267,14 @@ struct BasicMesh
 	USHORT       numIndices;
 	ID3D11Buffer *vertexBuffer;
 	ID3D11Buffer *indexBuffer;
+	Material material;
 	ID3D11ShaderResourceView *textureResourceView;
 };
 
-struct PointLight {
-	PointLight() { ZeroMemory(this, sizeof(this)); }
-
-	XMFLOAT4 Ambient;
-	XMFLOAT4 Diffuse;
-	XMFLOAT4 Specular;
-
-	XMFLOAT3 Position;
-	float Range;
-
-	XMFLOAT3 Att;
-	float Pad;
-};
-
-
 BasicMesh					*g_MeshPig;
+DirectionalLight			mDirLight;
+PointLight					mPointLight;
+SpotLight					mSpotLight;
 
 UINT                        g_iCBPSPerFrameBind = 1;
 
@@ -297,6 +341,7 @@ void CALLBACK OnD3D11FrameRender( ID3D11Device* pd3dDevice, ID3D11DeviceContext*
 void InitApp();
 void RenderText();
 void charStrToWideChar(WCHAR *dest, char *source);
+Material GetDXUTMeshMaterial(CDXUTSDKMesh *mesh);
 void RenderMeshDXUT (ID3D11DeviceContext* pd3dImmediateContext, CDXUTSDKMesh *toRender);
 void RenderMeshDXUT(ID3D11DeviceContext* pd3dImmediateContext, CDXUTSDKMesh *toRender, ID3D11PixelShader *pixelShader);
 void RenderMeshOBJ(ID3D11Device *pd3dDevice, ID3D11DeviceContext *pContext, BasicMesh *mesh);
@@ -716,6 +761,27 @@ HRESULT CALLBACK OnD3D11CreateDevice( ID3D11Device* pd3dDevice, const DXGI_SURFA
 											 0.01f,						// Near clipping plane.
 											 500.0f );					// Far clipping plane.
 
+	//Init directional light 
+	mDirLight.Ambient = XMFLOAT4(0.2f, 0.2f, 0.2f, 1.0f);
+	mDirLight.Diffuse = XMFLOAT4(0.5f, 0.5f, 0.5f, 1.0f);
+	mDirLight.Specular = XMFLOAT4(0.5f, 0.5f, 0.5f, 1.0f);
+	mDirLight.Direction = XMFLOAT3(0.57735f, -0.57735f, 0.57735f);
+
+	//Init point light
+	mPointLight.Ambient = XMFLOAT4(0.3f, 0.3f, 0.3f, 1.0f);
+	mPointLight.Diffuse = XMFLOAT4(0.7f, 0.7f, 0.7f, 1.0f);
+	mPointLight.Specular = XMFLOAT4(0.7f, 0.7f, 0.7f, 1.0f);
+	mPointLight.Att = XMFLOAT3(0.0f, 0.1f, 0.0f);
+	mPointLight.Range = 25.0f;
+
+	//Init spot light
+	mSpotLight.Ambient = XMFLOAT4(0.0f, 0.0f, 0.0f, 1.0f);
+	mSpotLight.Diffuse = XMFLOAT4(1.0f, 1.0f, 0.0f, 1.0f);
+	mSpotLight.Specular = XMFLOAT4(1.0f, 1.0f, 1.0f, 1.0f);
+	mSpotLight.Att = XMFLOAT3(1.0f, 0.0f, 0.0f);
+	mSpotLight.Spot = 96.0f;
+	mSpotLight.Range = 10000.0f;
+
 
 	//**************************************************************************//
     // Load the mesh.															//
@@ -927,23 +993,38 @@ void CALLBACK OnD3D11FrameRender( ID3D11Device* pd3dDevice, ID3D11DeviceContext*
 	// vector.  It is kind-a-silly doing this every frame unless the	//
 	// light moves.														//
 	//******************************************************************//
-    float    fAmbient                = 0.1f;
+    float    fAmbient                = 0.0f;
 	XMVECTOR vectorLightDirection    = XMVectorSet(-1, 1, -2, 0);  // 4th value unused.
 	vectorLightDirection = XMVector3Normalize(vectorLightDirection);
-										
 
+	XMFLOAT3 eyePos(XMVectorGetX(Eye), XMVectorGetY(Eye), XMVectorGetZ(Eye));
 
 	CB_PS_PER_FRAME CBPerFrame;
 	CBPerFrame.m_vLightDirAmbient = vectorLightDirection;
+	CBPerFrame.dirLight = mDirLight;
+
+	// Circle light over the land surface.
+	mPointLight.Position.x = 70.0f*cosf(0.2f*timeGetTime());
+	mPointLight.Position.z = 70.0f*sinf(0.2f*timeGetTime());
+	mPointLight.Position.y = 5.0f;
+	CBPerFrame.pointLight = mPointLight;
+
+	//Make spot light shine from tiger
+	mSpotLight.Position = eyePos;
+	XMStoreFloat3(&mSpotLight.Direction, XMVector3Normalize(At - Eye));
+	CBPerFrame.spotLight = mSpotLight;
+
+	CBPerFrame.eyePos = eyePos;
 	pd3dImmediateContext->UpdateSubresource( g_pcbPSPerFrame, 0, NULL, &CBPerFrame, 0, 0 );
 	pd3dImmediateContext->PSSetConstantBuffers( 1, 1, &g_pcbPSPerFrame );
 
+	Material matTiger = GetDXUTMeshMaterial(&g_MeshTiger);
 
 	CB_PS_PER_OBJECT CBPerObject;
 	CBPerObject.m_vObjectColor = XMFLOAT4(1, 1, 1, 1);
+	CBPerObject.material = matTiger;
 	pd3dImmediateContext->UpdateSubresource( g_pcbPSPerObject, 0, NULL, &CBPerObject, 0, 0 );
 	pd3dImmediateContext->PSSetConstantBuffers( 0, 1, &g_pcbPSPerObject );
-
 
     pd3dImmediateContext->PSSetSamplers( 0, 1, &g_pSamLinear );
 
@@ -992,6 +1073,14 @@ void CALLBACK OnD3D11FrameRender( ID3D11Device* pd3dDevice, ID3D11DeviceContext*
 	pd3dImmediateContext->UpdateSubresource(g_pcbVSPerObject, 0, NULL, &CBMatrices, 0, 0);
 	pd3dImmediateContext->VSSetConstantBuffers(0, 1, &g_pcbVSPerObject);
 
+	Material matFloor = GetDXUTMeshMaterial(&g_MeshFloorTile);
+
+	CBPerObject.material = matFloor;
+	pd3dImmediateContext->UpdateSubresource(g_pcbPSPerObject, 0, NULL, &CBPerObject, 0, 0);
+	pd3dImmediateContext->PSSetConstantBuffers(0, 1, &g_pcbPSPerObject);
+
+	pd3dImmediateContext->PSSetSamplers(0, 1, &g_pSamLinear);
+
 	RenderMeshDXUT(pd3dImmediateContext, &g_MeshFloorTile);
 
 	//OBJ Meshes - done after DXUT in batch so doesn't redo everything
@@ -1000,6 +1089,12 @@ void CALLBACK OnD3D11FrameRender( ID3D11Device* pd3dDevice, ID3D11DeviceContext*
 	CBMatrices.matWorldViewProj = XMMatrixTranspose(matPigWorldViewProjection);
 	pd3dImmediateContext->UpdateSubresource(g_pcbVSPerObject, 0, NULL, &CBMatrices, 0, 0);
 	pd3dImmediateContext->VSSetConstantBuffers(0, 1, &g_pcbVSPerObject);
+
+	CBPerObject.material = g_MeshPig->material;
+	pd3dImmediateContext->UpdateSubresource(g_pcbPSPerObject, 0, NULL, &CBPerObject, 0, 0);
+	pd3dImmediateContext->PSSetConstantBuffers(0, 1, &g_pcbPSPerObject);
+
+	pd3dImmediateContext->PSSetSamplers(0, 1, &g_pSamLinear);
 
 	RenderMeshOBJ(pd3dDevice, pd3dImmediateContext, g_MeshPig);
 
@@ -1021,6 +1116,24 @@ void CALLBACK OnD3D11FrameRender( ID3D11Device* pd3dDevice, ID3D11DeviceContext*
     RenderText();
     DXUT_EndPerfEvent();
 }
+
+Material GetDXUTMeshMaterial(CDXUTSDKMesh *mesh)
+{
+	Material material;
+	material.Ambient.x = mesh->GetMaterial(0)->Ambient.x;
+	material.Ambient.y = mesh->GetMaterial(0)->Ambient.y;
+	material.Ambient.z = mesh->GetMaterial(0)->Ambient.z;
+	material.Ambient.w = mesh->GetMaterial(0)->Ambient.w;
+	material.Diffuse.x = mesh->GetMaterial(0)->Diffuse.x;
+	material.Diffuse.y = mesh->GetMaterial(0)->Diffuse.y;
+	material.Diffuse.z = mesh->GetMaterial(0)->Diffuse.z;
+	material.Diffuse.w = mesh->GetMaterial(0)->Diffuse.w;
+	material.Specular.x = mesh->GetMaterial(0)->Specular.x;
+	material.Specular.y = mesh->GetMaterial(0)->Specular.y;
+	material.Specular.z = mesh->GetMaterial(0)->Specular.z;
+	material.Specular.w = mesh->GetMaterial(0)->Specular.w;
+	return material;
+};
 
 //Render a mesh using the default Pixel Shader
 void RenderMeshDXUT(ID3D11DeviceContext *pContext,
@@ -1389,6 +1502,7 @@ HRESULT ParseMtlFile(ID3D11Device *pd3dDevice, ID3D11DeviceContext *pImmediateCo
 	{
 		line = TrimStart(line);
 
+
 		if (line.compare(0, 7, L"newmtl ") == 0)
 		{
 			WCHAR first[7];
@@ -1397,6 +1511,42 @@ HRESULT ParseMtlFile(ID3D11Device *pd3dDevice, ID3D11DeviceContext *pImmediateCo
 			WCHAR oldStyleStr[57];
 			wcscpy(oldStyleStr, line.c_str());
 			swscanf(oldStyleStr, L"%6s%s", first, mtlName);
+		}
+
+		if (line.compare(0, 3, L"Ka ") == 0)
+		{
+			WCHAR first[3];
+			float red, green, blue; 
+
+			WCHAR oldStyleStr[53];
+			wcscpy(oldStyleStr, line.c_str());
+			swscanf(oldStyleStr, L"%2s%f%f%f", first, &red, &green, &blue);
+
+			mesh->material.Ambient = XMFLOAT4(red, green, blue, 1);
+		}
+
+		if (line.compare(0, 3, L"Kd ") == 0)
+		{
+			WCHAR first[3];
+			float red, green, blue;
+
+			WCHAR oldStyleStr[53];
+			wcscpy(oldStyleStr, line.c_str());
+			swscanf(oldStyleStr, L"%2s%f%f%f", first, &red, &green, &blue);
+
+			mesh->material.Diffuse = XMFLOAT4(red, green, blue, 1);
+		}
+
+		if (line.compare(0, 3, L"Ks ") == 0)
+		{
+			WCHAR first[3];
+			float red, green, blue;
+
+			WCHAR oldStyleStr[53];
+			wcscpy(oldStyleStr, line.c_str());
+			swscanf(oldStyleStr, L"%2s%f%f%f", first, &red, &green, &blue);
+
+			mesh->material.Specular = XMFLOAT4(red, green, blue, 1);
 		}
 
 		if (line.compare(0, 7, L"map_Kd ") == 0)
