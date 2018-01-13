@@ -139,6 +139,7 @@ struct OBJ
 };
 
 OBJ g_Pig(2.0, -1.0, -1.0);
+OBJ g_ShinyPig(-2.0, -1.0, -1.0);
 
 struct Material {
 	XMFLOAT4 Ambient;
@@ -229,6 +230,7 @@ struct CB_PS_PER_OBJECT
 {
     XMFLOAT4 m_vObjectColor;
 	Material material;
+	XMMATRIX matWorldViewProj;
 };
 UINT                        g_iCBPSPerObjectBind = 0;
 
@@ -272,6 +274,7 @@ struct BasicMesh
 };
 
 BasicMesh					*g_MeshPig;
+BasicMesh					*g_MeshShinyPig;
 DirectionalLight			mDirLight;
 PointLight					mPointLight;
 SpotLight					mSpotLight;
@@ -762,8 +765,8 @@ HRESULT CALLBACK OnD3D11CreateDevice( ID3D11Device* pd3dDevice, const DXGI_SURFA
 											 500.0f );					// Far clipping plane.
 
 	//Init directional light 
-	mDirLight.Ambient = XMFLOAT4(0.2f, 0.2f, 0.2f, 1.0f);
-	mDirLight.Diffuse = XMFLOAT4(0.5f, 0.5f, 0.5f, 1.0f);
+	mDirLight.Ambient = XMFLOAT4(0.01f, 0.01f, 0.01f, 1.0f);
+	mDirLight.Diffuse = XMFLOAT4(0.01f, 0.01f, 0.01f, 1.0f);
 	mDirLight.Specular = XMFLOAT4(0.5f, 0.5f, 0.5f, 1.0f);
 	mDirLight.Direction = XMFLOAT3(0.57735f, -0.57735f, 0.57735f);
 
@@ -793,6 +796,7 @@ HRESULT CALLBACK OnD3D11CreateDevice( ID3D11Device* pd3dDevice, const DXGI_SURFA
 	V_RETURN(g_MeshCloudBox.Create(pd3dDevice, L"Media\\cloudbox\\skysphere.sdkmesh", true));
 
 	g_MeshPig = LoadMesh(pd3dDevice, pd3dImmediateContext, "Media\\pig\\pig.obj");
+	g_MeshShinyPig = LoadMesh(pd3dDevice, pd3dImmediateContext, "Media\\pig\\pig.obj");
 
 	// Create a sampler state
     D3D11_SAMPLER_DESC SamDesc;
@@ -932,6 +936,12 @@ void CALLBACK OnD3D11FrameRender( ID3D11Device* pd3dDevice, ID3D11DeviceContext*
 	// The viewer matrix is created every frame here, which looks silly as the	//
 	// viewer never moves.  However in general your viewer does move.			//
 	//**************************************************************************//
+	XMVECTOR EyeOfTheTiger = XMVectorSet(
+		g_Tiger.g_f_TigerX + XMVectorGetX(vecArse),
+		g_Tiger.g_f_TigerY + XMVectorGetY(vecArse),
+		g_Tiger.g_f_TigerZ + XMVectorGetZ(vecArse),
+		0) * tigerScaleConstant;
+
 	XMVECTOR Eye = XMVectorSet(
 		g_Tiger.g_f_TigerX + XMVectorGetX(vecArse), 
 		g_Tiger.g_f_TigerY + XMVectorGetY(vecArse) + arseHeightOffset,
@@ -987,6 +997,13 @@ void CALLBACK OnD3D11FrameRender( ID3D11Device* pd3dDevice, ID3D11DeviceContext*
 
 	XMMATRIX matPigWorldViewProjection = matPigWorld * matView * g_MatProjection;
 
+	//Shiny Pig
+	XMMATRIX matShinyPigTranslate = XMMatrixTranslation(g_ShinyPig.x, g_ShinyPig.y, g_ShinyPig.z);
+	XMMATRIX matShinyPigScale = XMMatrixScaling(1, 1, 1);
+	XMMATRIX matShinyPigWorld = matShinyPigTranslate * matShinyPigScale;
+
+	XMMATRIX matShinyPigWorldViewProjection = matShinyPigWorld * matView * g_MatProjection;
+
 	//******************************************************************//
 	// Lighting.  Ambient light and a light direction, above, to the	//
 	// left and two paces back, I think.  Then normalise the light		//
@@ -1004,14 +1021,14 @@ void CALLBACK OnD3D11FrameRender( ID3D11Device* pd3dDevice, ID3D11DeviceContext*
 	CBPerFrame.dirLight = mDirLight;
 
 	// Circle light over the land surface.
-	mPointLight.Position.x = 70.0f*cosf(0.2f*timeGetTime());
-	mPointLight.Position.z = 70.0f*sinf(0.2f*timeGetTime());
+	mPointLight.Position.x = 35.0f*cosf(0.001*timeGetTime());
+	mPointLight.Position.z = 35.0f*sinf(0.001*timeGetTime());
 	mPointLight.Position.y = 5.0f;
 	CBPerFrame.pointLight = mPointLight;
 
 	//Make spot light shine from tiger
 	mSpotLight.Position = eyePos;
-	XMStoreFloat3(&mSpotLight.Direction, XMVector3Normalize(At - Eye));
+	XMStoreFloat3(&mSpotLight.Direction, XMVector3Normalize(At - EyeOfTheTiger));
 	CBPerFrame.spotLight = mSpotLight;
 
 	CBPerFrame.eyePos = eyePos;
@@ -1045,6 +1062,7 @@ void CALLBACK OnD3D11FrameRender( ID3D11Device* pd3dDevice, ID3D11DeviceContext*
 	CB_VS_PER_OBJECT CBMatrices;
 	CBMatrices.matWorld = XMMatrixTranspose(matTigerWorld);
 	CBMatrices.matWorldViewProj = XMMatrixTranspose(matWorldViewProjection);
+	CBPerObject.matWorldViewProj = CBMatrices.matWorldViewProj;
 	pd3dImmediateContext->UpdateSubresource(g_pcbVSPerObject, 0, NULL, &CBMatrices, 0, 0);
 	pd3dImmediateContext->VSSetConstantBuffers(0, 1, &g_pcbVSPerObject);
 
@@ -1056,6 +1074,7 @@ void CALLBACK OnD3D11FrameRender( ID3D11Device* pd3dDevice, ID3D11DeviceContext*
 	
 	CBMatrices.matWorld = XMMatrixTranspose(matWingLHWorld);
 	CBMatrices.matWorldViewProj = XMMatrixTranspose(matWingLHWorldViewProjection);
+	CBPerObject.matWorldViewProj = CBMatrices.matWorldViewProj;
 	pd3dImmediateContext->UpdateSubresource(g_pcbVSPerObject, 0, NULL, &CBMatrices, 0, 0);
 	pd3dImmediateContext->VSSetConstantBuffers(0, 1, &g_pcbVSPerObject); 
 
@@ -1063,6 +1082,7 @@ void CALLBACK OnD3D11FrameRender( ID3D11Device* pd3dDevice, ID3D11DeviceContext*
 
 	CBMatrices.matWorld = XMMatrixTranspose(matWingWorldRH);
 	CBMatrices.matWorldViewProj = XMMatrixTranspose(matWingRHWorldViewProjection);
+	CBPerObject.matWorldViewProj = CBMatrices.matWorldViewProj;
 	pd3dImmediateContext->UpdateSubresource(g_pcbVSPerObject, 0, NULL, &CBMatrices, 0, 0);
 	pd3dImmediateContext->VSSetConstantBuffers(0, 1, &g_pcbVSPerObject);
 
@@ -1070,6 +1090,7 @@ void CALLBACK OnD3D11FrameRender( ID3D11Device* pd3dDevice, ID3D11DeviceContext*
     
 	CBMatrices.matWorld = XMMatrixTranspose(matFloorWorld);
 	CBMatrices.matWorldViewProj = XMMatrixTranspose(matFloorWorldViewProjection);
+	CBPerObject.matWorldViewProj = CBMatrices.matWorldViewProj;
 	pd3dImmediateContext->UpdateSubresource(g_pcbVSPerObject, 0, NULL, &CBMatrices, 0, 0);
 	pd3dImmediateContext->VSSetConstantBuffers(0, 1, &g_pcbVSPerObject);
 
@@ -1087,6 +1108,7 @@ void CALLBACK OnD3D11FrameRender( ID3D11Device* pd3dDevice, ID3D11DeviceContext*
 
 	CBMatrices.matWorld = XMMatrixTranspose(matPigWorld);
 	CBMatrices.matWorldViewProj = XMMatrixTranspose(matPigWorldViewProjection);
+	CBPerObject.matWorldViewProj = CBMatrices.matWorldViewProj;
 	pd3dImmediateContext->UpdateSubresource(g_pcbVSPerObject, 0, NULL, &CBMatrices, 0, 0);
 	pd3dImmediateContext->VSSetConstantBuffers(0, 1, &g_pcbVSPerObject);
 
@@ -1098,10 +1120,26 @@ void CALLBACK OnD3D11FrameRender( ID3D11Device* pd3dDevice, ID3D11DeviceContext*
 
 	RenderMeshOBJ(pd3dDevice, pd3dImmediateContext, g_MeshPig);
 
+	CBMatrices.matWorld = XMMatrixTranspose(matShinyPigWorld);
+	CBMatrices.matWorldViewProj = XMMatrixTranspose(matShinyPigWorldViewProjection);
+	CBPerObject.matWorldViewProj = CBMatrices.matWorldViewProj;
+	pd3dImmediateContext->UpdateSubresource(g_pcbVSPerObject, 0, NULL, &CBMatrices, 0, 0);
+	pd3dImmediateContext->VSSetConstantBuffers(0, 1, &g_pcbVSPerObject);
+
+	CBPerObject.material = g_MeshShinyPig->material;
+	CBPerObject.material.Specular = XMFLOAT4(1, 1, 1, 1);
+	pd3dImmediateContext->UpdateSubresource(g_pcbPSPerObject, 0, NULL, &CBPerObject, 0, 0);
+	pd3dImmediateContext->PSSetConstantBuffers(0, 1, &g_pcbPSPerObject);
+
+	pd3dImmediateContext->PSSetSamplers(0, 1, &g_pSamLinear);
+
+	RenderMeshOBJ(pd3dDevice, pd3dImmediateContext, g_MeshShinyPig);
+
 	//Render this DXUT after OBJ because different pixel shader
 
 	CBMatrices.matWorld = XMMatrixTranspose(matSkyboxWorld);
 	CBMatrices.matWorldViewProj = XMMatrixTranspose(matSkyboxWorldViewProjection);
+	CBPerObject.matWorldViewProj = CBMatrices.matWorldViewProj;
 	pd3dImmediateContext->UpdateSubresource(g_pcbVSPerObject, 0, NULL, &CBMatrices, 0, 0);
 	pd3dImmediateContext->VSSetConstantBuffers(0, 1, &g_pcbVSPerObject);
 
@@ -1616,6 +1654,13 @@ void CALLBACK OnD3D11DestroyDevice( void* pUserContext )
 	SAFE_RELEASE(g_MeshPig->indexBuffer);
 	g_MeshPig->textureResourceView->Release();
 	delete g_MeshPig;
+
+	delete g_MeshShinyPig->indexes;
+	delete g_MeshShinyPig->vertices;
+	SAFE_RELEASE(g_MeshShinyPig->vertexBuffer);
+	SAFE_RELEASE(g_MeshShinyPig->indexBuffer);
+	g_MeshShinyPig->textureResourceView->Release();
+	delete g_MeshShinyPig;
                 
     SAFE_RELEASE( g_pVertexLayout11 );
     SAFE_RELEASE( g_pVertexBuffer );

@@ -69,6 +69,7 @@ struct VS_OUTPUT
 {
 	float3 vNormal		: NORMAL;
 	float2 vTexcoord	: TEXCOORD0;
+	float3 vPosW		: POSITION;
 	float4 vPosition	: SV_POSITION;
 };
 
@@ -80,6 +81,8 @@ struct VS_OUTPUT
 VS_OUTPUT VS_DXUTSDKMesh( VS_INPUT Input )
 {
 	VS_OUTPUT Output;
+
+	Output.vPosW = Input.vPosition;
 	//**********************************************************************//
 	// Multiply every vertex vy the WVP matrix (we do it "properly here		//
 	// unlike the cubes sample.												//

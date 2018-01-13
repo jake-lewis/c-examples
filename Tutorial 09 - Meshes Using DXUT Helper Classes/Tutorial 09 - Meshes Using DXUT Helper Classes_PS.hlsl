@@ -229,6 +229,7 @@ cbuffer cbPerObject : register( b0 )
 {
 	float4		g_vObjectColor;
 	Material gMaterial;
+	float4x4 gWorldViewProj;
 };
 
 cbuffer cbPerFrame : register( b1 )
@@ -268,6 +269,7 @@ struct PS_INPUT
 {
 	float3 vNormal		: NORMAL;
 	float2 vTexcoord	: TEXCOORD0;
+	float3 vPosW		: POSITION;
 	float4 vPosition	: SV_POSITION;	// Nigel added position; it wasn't in M$ sample, why?
 };
 
@@ -280,24 +282,24 @@ float4 PS_DXUTSDKMesh( PS_INPUT Input ) : SV_TARGET
 {
 	float4 vDiffuse = g_txDiffuse.Sample( g_samLinear, Input.vTexcoord );
 
-	float3 toEyeW = normalize(gEyePosW - Input.vPosition);
+	float3 toEyeW = normalize(gEyePosW - Input.vPosW);
 
 	float4 ambient = float4(0.0f, 0.0f, 0.0f, 0.0f);
 	float4 diffuse = float4(0.0f, 0.0f, 0.0f, 0.0f);
 	float4 spec = float4(0.0f, 0.0f, 0.0f, 0.0f);
 	float4 A, D, S;
 
-	/*ComputeDirectionalLight(gMaterial, g_DirLight, Input.vNormal, toEyeW, A, D, S);
-	ambient += A;
-	diffuse += D;
-	spec += S;*/
-
-	ComputePointLight(gMaterial, g_PointLight, Input.vPosition , Input.vNormal, toEyeW, A, D, S);
+	ComputeDirectionalLight(gMaterial, g_DirLight, Input.vNormal, toEyeW, A, D, S);
 	ambient += A;
 	diffuse += D;
 	spec += S;
 
-	ComputeSpotLight(gMaterial, g_SpotLight, Input.vPosition, Input.vNormal, toEyeW, A, D, S);
+	ComputePointLight(gMaterial, g_PointLight, Input.vPosW, Input.vNormal, toEyeW, A, D, S);
+	ambient += A;
+	diffuse += D;
+	spec += S;
+
+	ComputeSpotLight(gMaterial, g_SpotLight, Input.vPosW, Input.vNormal, toEyeW, A, D, S);
 	ambient += A;
 	diffuse += D;
 	spec += S;
